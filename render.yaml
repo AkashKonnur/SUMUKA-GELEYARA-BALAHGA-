@@ -1,13 +1,13 @@
 # ════════════════════════════════════════════════════════════════════════
-#  Render Deployment Configuration
+#  Render Deployment Configuration (100% Free Tier Compatible)
 #  Sumuka Geleyara Balaga — Ganeshotsava 2026 Website
 #
 #  HOW TO DEPLOY:
 #  1. Push this repo to GitHub
 #  2. Go to https://dashboard.render.com → New → Web Service
 #  3. Connect your GitHub repository
-#  4. Render auto-detects this file and pre-fills settings
-#  5. Add Environment Variables in Render dashboard (see .env.example)
+#  4. Render auto-detects this file and pre-fills Free tier settings
+#  5. Add ADMIN_EMAIL & ADMIN_PASSWORD in Render dashboard Environment tab
 #  6. Click Deploy
 # ════════════════════════════════════════════════════════════════════════
 
@@ -15,8 +15,7 @@ services:
   - type: web
     name: sumuka-ganeshotsava-2026
     runtime: node
-    plan: free            # Note: Render Persistent Disks require a paid instance plan (e.g. Starter).
-                          # If using the Free plan, files will save but reset on redeployment.
+    plan: free
 
     # ── Build & Start ────────────────────────────────────────────────
     buildCommand: npm install && npm run build
@@ -33,25 +32,13 @@ services:
         generateValue: false
 
       # ── REQUIRED: Admin Login Credentials ────────────────────────
+      # Set your custom admin email and password in Render's Environment tab
       - key: ADMIN_EMAIL
         sync: false
 
       - key: ADMIN_PASSWORD
         sync: false
 
-      # ── Persistent Storage Directory ─────────────────────────────
-      # Mounts the Render Persistent Disk so CMS changes are preserved.
-      - key: DATA_DIR
-        value: /data
-
       # ── OPTIONAL: Google Maps ────────────────────────────────────
       - key: NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
         sync: false
-
-    # ── Persistent Disk (Optional but Recommended) ───────────────────
-    # Keeps your admin CMS changes safe when the site restarts or rebuilds.
-    # Note: Requires a Render "Starter" or higher web service type.
-    disk:
-      name: sumuka-data
-      mountPath: /data
-      sizeGB: 1

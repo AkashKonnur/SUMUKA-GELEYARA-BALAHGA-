@@ -2,14 +2,25 @@
  * Server-side file-based JSON storage.
  * Data is stored in JSON files inside the DATA_DIR directory.
  * Default: <project_root>/data/
- * On Render with persistent disk: set DATA_DIR=/data env var and mount disk there.
+ *
+ * NOTE ON RENDER FREE TIER:
+ * Render Free instances use an ephemeral filesystem. Any edits made via the
+ * Admin panel are stored in memory/disk for the active container lifetime.
+ * If the instance restarts, it safely falls back to the default data in fallbackData.js.
  */
 
 import fs from "fs";
 import path from "path";
-import { fallbackSiteInfo, fallbackEvents, fallbackAnnouncements, fallbackJourney, fallbackDonation, fallbackLocation } from "./fallbackData.js";
+import {
+  fallbackSiteInfo,
+  fallbackEvents,
+  fallbackAnnouncements,
+  fallbackJourney,
+  fallbackDonation,
+  fallbackLocation,
+} from "./fallbackData.js";
 
-// Where data files are stored. Override with DATA_DIR env var for Render persistent disk.
+// Data directory path (defaults to ./data inside project root)
 const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data");
 
 // Default data for each collection
