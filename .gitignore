@@ -1,0 +1,55 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# ── Dependencies ──────────────────────────────────────────
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# ── Testing ───────────────────────────────────────────────
+/coverage
+
+# ── Next.js build output ──────────────────────────────────
+/.next/
+/out/
+/build
+
+# ── Environment variables ─────────────────────────────────
+# DO commit: .env.example (safe template with no real values)
+# DO NOT commit: actual env files with real credentials
+.env
+.env.local
+.env.development
+.env.development.local
+.env.test
+.env.test.local
+.env.production
+.env.production.local
+
+# ── Misc ──────────────────────────────────────────────────
+.DS_Store
+*.pem
+Thumbs.db
+
+# ── Debug logs ────────────────────────────────────────────
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ── Render / Vercel / deploy ──────────────────────────────
+.vercel
+
+# ── TypeScript ────────────────────────────────────────────
+*.tsbuildinfo
+next-env.d.ts
+
+# ── IDE / Editor ──────────────────────────────────────────
+.idea/
+.vscode/settings.json
+*.swp
+*.swo
