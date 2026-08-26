@@ -15,7 +15,8 @@ services:
   - type: web
     name: sumuka-ganeshotsava-2026
     runtime: node
-    plan: free            # Change to "starter" or higher for production traffic
+    plan: free            # Note: Render Persistent Disks require a paid instance plan (e.g. Starter).
+                          # If using the Free plan, files will save but reset on redeployment.
 
     # ── Build & Start ────────────────────────────────────────────────
     buildCommand: npm install && npm run build
@@ -27,38 +28,30 @@ services:
       - key: NODE_ENV
         value: production
 
-      # Port — Render sets this automatically; Next.js reads it automatically
+      # Port — Render sets this automatically
       - key: PORT
-        generateValue: false   # Render injects this; do NOT override
+        generateValue: false
 
       # ── REQUIRED: Admin Login Credentials ────────────────────────
-      # Set these in the Render dashboard → Environment tab
       - key: ADMIN_EMAIL
-        sync: false            # Must be set manually in Render dashboard
+        sync: false
 
       - key: ADMIN_PASSWORD
-        sync: false            # Must be set manually in Render dashboard
-
-      # ── OPTIONAL: Firebase (for live CMS features) ────────────────
-      # Without Firebase, site works with static fallback data
-      - key: NEXT_PUBLIC_FIREBASE_API_KEY
         sync: false
 
-      - key: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-        sync: false
-
-      - key: NEXT_PUBLIC_FIREBASE_PROJECT_ID
-        sync: false
-
-      - key: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-        sync: false
-
-      - key: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-        sync: false
-
-      - key: NEXT_PUBLIC_FIREBASE_APP_ID
-        sync: false
+      # ── Persistent Storage Directory ─────────────────────────────
+      # Mounts the Render Persistent Disk so CMS changes are preserved.
+      - key: DATA_DIR
+        value: /data
 
       # ── OPTIONAL: Google Maps ────────────────────────────────────
       - key: NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
         sync: false
+
+    # ── Persistent Disk (Optional but Recommended) ───────────────────
+    # Keeps your admin CMS changes safe when the site restarts or rebuilds.
+    # Note: Requires a Render "Starter" or higher web service type.
+    disk:
+      name: sumuka-data
+      mountPath: /data
+      sizeGB: 1

@@ -1,6 +1,5 @@
 "use client";
 import { useState, useEffect } from "react";
-import { getEvents, setSingleDoc } from "@/lib/firestore";
 import { fallbackEvents } from "@/lib/fallbackData";
 
 export default function AdminEventsPage() {
@@ -8,16 +7,15 @@ export default function AdminEventsPage() {
   const [activeDayIndex, setActiveDayIndex] = useState(0);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
-
-  // Form for adding/editing an item
   const [newItem, setNewItem] = useState({ time: "", title: "", description: "" });
   const [editIndex, setEditIndex] = useState(-1);
 
   useEffect(() => {
     async function load() {
       try {
-        const data = await getEvents();
-        if (data && data.length) setEvents(data);
+        const res = await fetch("/api/data/events");
+        const data = await res.json();
+        if (Array.isArray(data) && data.length) setEvents(data);
       } catch {}
     }
     load();
@@ -38,11 +36,7 @@ export default function AdminEventsPage() {
       dayItems.push(newItem);
     }
 
-    updatedEvents[activeDayIndex] = {
-      ...updatedEvents[activeDayIndex],
-      items: dayItems,
-    };
-
+    updatedEvents[activeDayIndex] = { ...updatedEvents[activeDayIndex], items: dayItems };
     setEvents(updatedEvents);
     setNewItem({ time: "", title: "", description: "" });
     setEditIndex(-1);
@@ -53,10 +47,7 @@ export default function AdminEventsPage() {
     const updatedEvents = [...events];
     const dayItems = [...updatedEvents[activeDayIndex].items];
     dayItems.splice(idx, 1);
-    updatedEvents[activeDayIndex] = {
-      ...updatedEvents[activeDayIndex],
-      items: dayItems,
-    };
+    updatedEvents[activeDayIndex] = { ...updatedEvents[activeDayIndex], items: dayItems };
     setEvents(updatedEvents);
   }
 
@@ -64,13 +55,15 @@ export default function AdminEventsPage() {
     setSaving(true);
     setMessage("");
     try {
-      // Save each day doc
-      for (let i = 0; i < events.length; i++) {
-        await setSingleDoc("events", events[i], `day${i + 1}`);
-      }
+      const res = await fetch("/api/data/events", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(events),
+      });
+      if (!res.ok) throw new Error();
       setMessage("✅ Schedule changes saved successfully!");
-    } catch (err) {
-      setMessage("⚠️ Failed to save to database. Check Firebase connection.");
+    } catch {
+      setMessage("❌ Failed to save. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -80,9 +73,7 @@ export default function AdminEventsPage() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="font-[var(--font-heading)] text-xl text-white">
-            Program Schedule Manager
-          </h1>
+          <h1 className="font-[var(--font-heading)] text-xl text-white">Program Schedule Manager</h1>
           <p className="text-xs text-muted mt-1">
             Add, update, or remove activities for Day 1, Day 2, and Day 3.
           </p>
@@ -107,11 +98,7 @@ export default function AdminEventsPage() {
         {events.map((d, i) => (
           <button
             key={i}
-            onClick={() => {
-              setActiveDayIndex(i);
-              setEditIndex(-1);
-              setNewItem({ time: "", title: "", description: "" });
-            }}
+            onClick={() => { setActiveDayIndex(i); setEditIndex(-1); setNewItem({ time: "", title: "", description: "" }); }}
             className={`px-4 py-2.5 rounded-lg text-xs font-semibold cursor-pointer border transition-all ${
               activeDayIndex === i
                 ? "bg-gold text-maroon-deep border-gold font-bold"
@@ -124,124 +111,51 @@ export default function AdminEventsPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Existing Items Table */}
+        {/* Existing Items */}
         <div className="lg:col-span-7 bg-[#160d08] border border-[rgba(217,169,70,0.18)] rounded-xl p-5">
           <h2 className="text-sm font-semibold text-gold-light mb-4 flex justify-between">
             <span>Current Day {activeDayIndex + 1} Activities</span>
-            <span className="text-xs text-muted">
-              {currentDay.items?.length || 0} items
-            </span>
+            <span className="text-xs text-muted">{currentDay.items?.length || 0} items</span>
           </h2>
-
           <div className="space-y-3">
             {currentDay.items?.map((item, idx) => (
-              <div
-                key={idx}
-                className="bg-[#0f0a07] border border-[rgba(255,255,255,0.06)] rounded-lg p-3.5 flex justify-between items-start hover:border-gold/30 transition-all"
-              >
+              <div key={idx} className="bg-[#0f0a07] border border-[rgba(255,255,255,0.06)] rounded-lg p-3.5 flex justify-between items-start hover:border-gold/30 transition-all">
                 <div>
-                  <span className="text-[0.7rem] font-mono text-gold-muted font-bold block">
-                    {item.time}
-                  </span>
-                  <h4 className="text-sm text-white font-medium mt-0.5">
-                    {item.title}
-                  </h4>
-                  {item.description && (
-                    <p className="text-xs text-muted mt-1 leading-relaxed">
-                      {item.description}
-                    </p>
-                  )}
+                  <span className="text-[0.7rem] font-mono text-gold-muted font-bold block">{item.time}</span>
+                  <h4 className="text-sm text-white font-medium mt-0.5">{item.title}</h4>
+                  {item.description && <p className="text-xs text-muted mt-1 leading-relaxed">{item.description}</p>}
                 </div>
                 <div className="flex gap-2 ml-4">
-                  <button
-                    onClick={() => {
-                      setEditIndex(idx);
-                      setNewItem(item);
-                    }}
-                    className="text-xs text-gold-light bg-gold/10 hover:bg-gold/20 px-2 py-1 rounded"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDeleteItem(idx)}
-                    className="text-xs text-red-400 bg-red-950/40 hover:bg-red-900/60 px-2 py-1 rounded"
-                  >
-                    Delete
-                  </button>
+                  <button onClick={() => { setEditIndex(idx); setNewItem(item); }} className="text-xs text-gold-light bg-gold/10 hover:bg-gold/20 px-2 py-1 rounded">Edit</button>
+                  <button onClick={() => handleDeleteItem(idx)} className="text-xs text-red-400 bg-red-950/40 hover:bg-red-900/60 px-2 py-1 rounded">Delete</button>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Form: Add / Edit Item */}
+        {/* Add / Edit Form */}
         <div className="lg:col-span-5 bg-[#160d08] border border-[rgba(217,169,70,0.18)] rounded-xl p-5">
           <h2 className="text-sm font-semibold text-gold-light mb-4">
             {editIndex >= 0 ? "✏️ Edit Activity" : "➕ Add New Activity"}
           </h2>
-
           <form onSubmit={handleSaveItem} className="space-y-4">
             <div>
-              <label className="block text-xs text-[#cfc0ab] mb-1 font-medium">
-                Time (e.g. "08:00 AM" or "06:30 PM")
-              </label>
-              <input
-                type="text"
-                required
-                value={newItem.time}
-                onChange={(e) => setNewItem({ ...newItem, time: e.target.value })}
-                placeholder="10:30 AM"
-                className="w-full bg-[#0c0704] border border-[rgba(217,169,70,0.25)] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-gold"
-              />
+              <label className="block text-xs text-[#cfc0ab] mb-1 font-medium">Time (e.g. &quot;08:00 AM&quot;)</label>
+              <input type="text" required value={newItem.time} onChange={(e) => setNewItem({ ...newItem, time: e.target.value })} placeholder="10:30 AM" className="w-full bg-[#0c0704] border border-[rgba(217,169,70,0.25)] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-gold" />
             </div>
-
             <div>
-              <label className="block text-xs text-[#cfc0ab] mb-1 font-medium">
-                Activity Title
-              </label>
-              <input
-                type="text"
-                required
-                value={newItem.title}
-                onChange={(e) => setNewItem({ ...newItem, title: e.target.value })}
-                placeholder="Maha Mangalaarathi"
-                className="w-full bg-[#0c0704] border border-[rgba(217,169,70,0.25)] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-gold"
-              />
+              <label className="block text-xs text-[#cfc0ab] mb-1 font-medium">Activity Title</label>
+              <input type="text" required value={newItem.title} onChange={(e) => setNewItem({ ...newItem, title: e.target.value })} placeholder="Maha Mangalaarathi" className="w-full bg-[#0c0704] border border-[rgba(217,169,70,0.25)] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-gold" />
             </div>
-
             <div>
-              <label className="block text-xs text-[#cfc0ab] mb-1 font-medium">
-                Short Description (Optional)
-              </label>
-              <textarea
-                rows={3}
-                value={newItem.description}
-                onChange={(e) =>
-                  setNewItem({ ...newItem, description: e.target.value })
-                }
-                placeholder="Devotees will gather for the grand aarti..."
-                className="w-full bg-[#0c0704] border border-[rgba(217,169,70,0.25)] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-gold"
-              />
+              <label className="block text-xs text-[#cfc0ab] mb-1 font-medium">Short Description (Optional)</label>
+              <textarea rows={3} value={newItem.description} onChange={(e) => setNewItem({ ...newItem, description: e.target.value })} placeholder="Devotees will gather for the grand aarti..." className="w-full bg-[#0c0704] border border-[rgba(217,169,70,0.25)] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-gold" />
             </div>
-
             <div className="flex gap-2 pt-2">
-              <button
-                type="submit"
-                className="btn-primary !py-2 !px-4 text-xs font-bold"
-              >
-                {editIndex >= 0 ? "Update Activity" : "Add to Day"}
-              </button>
+              <button type="submit" className="btn-primary !py-2 !px-4 text-xs font-bold">{editIndex >= 0 ? "Update Activity" : "Add to Day"}</button>
               {editIndex >= 0 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditIndex(-1);
-                    setNewItem({ time: "", title: "", description: "" });
-                  }}
-                  className="btn-outline !py-2 !px-3 text-xs"
-                >
-                  Cancel
-                </button>
+                <button type="button" onClick={() => { setEditIndex(-1); setNewItem({ time: "", title: "", description: "" }); }} className="btn-outline !py-2 !px-3 text-xs">Cancel</button>
               )}
             </div>
           </form>

@@ -1,14 +1,9 @@
 "use client";
 import { useState, useEffect } from "react";
-import {
-  getAnnouncements,
-  addDocument,
-  deleteDocument,
-} from "@/lib/firestore";
 import { fallbackAnnouncements } from "@/lib/fallbackData";
 
 export default function AdminAnnouncementsPage() {
-  const [announcements, setAnnouncements] = useState(fallbackAnnouncements);
+  const [announcements, setAnnouncements] = useState([]);
   const [text, setText] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [loading, setLoading] = useState(false);
@@ -17,9 +12,12 @@ export default function AdminAnnouncementsPage() {
   useEffect(() => {
     async function load() {
       try {
-        const data = await getAnnouncements();
-        if (data && data.length) setAnnouncements(data);
-      } catch {}
+        const res = await fetch("/api/data/announcements");
+        const data = await res.json();
+        setAnnouncements(Array.isArray(data) && data.length ? data : fallbackAnnouncements);
+      } catch {
+        setAnnouncements(fallbackAnnouncements);
+      }
     }
     load();
   }, []);
@@ -30,24 +28,22 @@ export default function AdminAnnouncementsPage() {
     setLoading(true);
     setMessage("");
 
-    const newDoc = {
-      text: text.trim(),
-      imageUrl: imageUrl.trim() || null,
-      createdAt: new Date().toISOString(),
-    };
-
     try {
-      const res = await addDocument("announcements", newDoc);
-      setAnnouncements([{ id: res.id, ...newDoc }, ...announcements]);
+      const res = await fetch("/api/data/announcements", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: text.trim(),
+          imageUrl: imageUrl.trim() || null,
+        }),
+      });
+      const newItem = await res.json();
+      setAnnouncements((prev) => [newItem, ...prev]);
       setText("");
       setImageUrl("");
       setMessage("✅ Announcement posted live on the website!");
     } catch {
-      // Local fallback
-      setAnnouncements([{ id: Date.now().toString(), ...newDoc }, ...announcements]);
-      setText("");
-      setImageUrl("");
-      setMessage("✅ Announcement saved locally!");
+      setMessage("❌ Failed to post. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -56,16 +52,18 @@ export default function AdminAnnouncementsPage() {
   async function handleDelete(id) {
     if (!confirm("Are you sure you want to delete this announcement?")) return;
     try {
-      await deleteDocument("announcements", id);
-    } catch {}
-    setAnnouncements(announcements.filter((a) => a.id !== id));
+      await fetch(`/api/data/announcements?id=${id}`, { method: "DELETE" });
+      setAnnouncements((prev) => prev.filter((a) => a.id !== id));
+    } catch {
+      setMessage("❌ Failed to delete. Please try again.");
+    }
   }
 
   return (
     <div>
       <div className="mb-6">
         <h1 className="font-[var(--font-heading)] text-xl text-white">
-          Live Announcements & Broadcasts
+          Live Announcements &amp; Broadcasts
         </h1>
         <p className="text-xs text-muted mt-1">
           Post live alerts that display directly in the home page Live Updates section.
@@ -92,9 +90,7 @@ export default function AdminAnnouncementsPage() {
                 className="bg-[#0f0a07] border border-[rgba(255,255,255,0.06)] rounded-lg p-4 flex justify-between items-start hover:border-gold/30 transition-all"
               >
                 <div>
-                  <p className="text-xs text-[#e8dcc8] leading-relaxed">
-                    {item.text}
-                  </p>
+                  <p className="text-xs text-[#e8dcc8] leading-relaxed">{item.text}</p>
                   {item.imageUrl && (
                     <img
                       src={item.imageUrl}
@@ -103,7 +99,7 @@ export default function AdminAnnouncementsPage() {
                     />
                   )}
                   <span className="text-[0.65rem] text-muted block mt-2">
-                    {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : "Active"}
+                    {item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-IN") : "Active"}
                   </span>
                 </div>
                 <button
@@ -114,14 +110,18 @@ export default function AdminAnnouncementsPage() {
                 </button>
               </div>
             ))}
+
+            {announcements.length === 0 && (
+              <div className="py-12 text-center text-xs text-muted border border-dashed border-[rgba(217,169,70,0.2)] rounded-lg">
+                No announcements yet. Use the form to post your first one.
+              </div>
+            )}
           </div>
         </div>
 
         {/* Post Form */}
         <div className="lg:col-span-5 bg-[#160d08] border border-[rgba(217,169,70,0.18)] rounded-xl p-5">
-          <h2 className="text-sm font-semibold text-gold-light mb-4">
-            📢 Post New Live Update
-          </h2>
+          <h2 className="text-sm font-semibold text-gold-light mb-4">📢 Post New Live Update</h2>
 
           <form onSubmit={handleCreate} className="space-y-4">
             <div>

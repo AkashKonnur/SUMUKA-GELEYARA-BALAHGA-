@@ -1,7 +1,5 @@
 "use client";
 import { createContext, useContext, useEffect, useState } from "react";
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth";
-import { auth } from "./firebase";
 
 const AuthContext = createContext(null);
 
@@ -10,99 +8,53 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check session storage for a previously verified session (set after API login)
-    const sessionUser = typeof window !== "undefined" ? sessionStorage.getItem("adminSessionUser") : null;
-    if (sessionUser) {
-      try {
-        setUser(JSON.parse(sessionUser));
-        setLoading(false);
-        return;
-      } catch {
-        sessionStorage.removeItem("adminSessionUser");
-      }
-    }
-
-    // Also listen to Firebase Auth state (for when Firebase is configured)
+    // Restore session from sessionStorage (set after successful API login)
+    if (typeof window === "undefined") return;
     try {
-      const unsubscribe = onAuthStateChanged(auth, (u) => {
-        if (u) {
-          setUser({ email: u.email, uid: u.uid });
-        }
-        // Note: we only set loading=false here if no session storage user was found
-        setLoading(false);
-      });
-      return () => unsubscribe();
-    } catch {
-      setLoading(false);
-    }
+      const stored = sessionStorage.getItem("adminUser");
+      if (stored) {
+        setUser(JSON.parse(stored));
+      }
+    } catch {}
+    setLoading(false);
   }, []);
 
   /**
-   * Login via server-side API (env-var credentials) first.
-   * Falls back to Firebase Auth if env-var credentials aren't configured.
+   * Login by calling the server-side API route.
+   * Credentials are checked against ADMIN_EMAIL + ADMIN_PASSWORD env vars.
+   * Sets an HttpOnly cookie on the server and stores user in sessionStorage.
    */
   const login = async (email, password) => {
-    // 1. Try server-side API login (works with env vars, no Firebase needed)
-    try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
 
-      const data = await res.json();
+    const data = await res.json();
 
-      if (res.ok && data.success) {
-        // API login succeeded — set session user in memory/sessionStorage
-        const sessionUser = { email: data.email || email, uid: "env-admin" };
-        setUser(sessionUser);
-        if (typeof window !== "undefined") {
-          sessionStorage.setItem("adminSessionUser", JSON.stringify(sessionUser));
-        }
-        return sessionUser;
-      }
-
-      // If server explicitly says to use Firebase (env vars not set), fall through
-      if (!data.useFirebase) {
-        // env vars are set but credentials were wrong
-        throw new Error(data.error || "Invalid email or password.");
-      }
-    } catch (apiErr) {
-      // If it's a credentials error (not a network error), throw immediately
-      if (apiErr.message && !apiErr.message.includes("fetch")) {
-        throw apiErr;
-      }
-      // Network error — fall through to Firebase attempt
+    if (!res.ok) {
+      throw new Error(data.error || "Invalid email or password.");
     }
 
-    // 2. Fallback: Firebase Auth (when Firebase is properly configured)
-    const firebaseApiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-    if (!firebaseApiKey || firebaseApiKey === "demo-api-key") {
-      throw new Error(
-        "Admin credentials not configured. Please set ADMIN_EMAIL and ADMIN_PASSWORD in your environment variables."
-      );
+    const sessionUser = { email: data.email };
+    setUser(sessionUser);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("adminUser", JSON.stringify(sessionUser));
     }
-
-    const res = await signInWithEmailAndPassword(auth, email, password);
-    return res.user;
+    return sessionUser;
   };
 
+  /**
+   * Logout — clears server cookie + client session.
+   */
   const logout = async () => {
-    // Clear session storage
     if (typeof window !== "undefined") {
-      sessionStorage.removeItem("adminSessionUser");
+      sessionStorage.removeItem("adminUser");
     }
-
-    // Clear server-side cookie via API
     try {
       await fetch("/api/auth/logout", { method: "POST" });
     } catch {}
-
-    // Sign out of Firebase if applicable
-    try {
-      await signOut(auth);
-    } catch {}
-
     setUser(null);
   };
 

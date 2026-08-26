@@ -10,24 +10,23 @@ export default function LiveUpdates({ announcements: initialAnnouncements }) {
   );
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // Firestore real-time listener — will work when Firebase is connected
+  // Fetch latest announcements on mount client-side
   useEffect(() => {
-    let unsubscribe;
-    async function setupListener() {
+    async function fetchAnnouncements() {
       try {
-        const { subscribeToCollection } = await import("@/lib/firestore");
-        unsubscribe = subscribeToCollection("announcements", (data) => {
-          if (data.length > 0) {
+        const res = await fetch("/api/data/announcements");
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
             setAnnouncements(data);
             setCurrentIndex(0);
           }
-        });
+        }
       } catch {
-        // Firebase not configured — use fallback data
+        // Fall back to initial/static data
       }
     }
-    setupListener();
-    return () => unsubscribe?.();
+    fetchAnnouncements();
   }, []);
 
   const next = () => setCurrentIndex((i) => (i + 1) % announcements.length);

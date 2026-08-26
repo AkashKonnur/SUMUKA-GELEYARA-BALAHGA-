@@ -1,6 +1,5 @@
 "use client";
 import { useState, useEffect } from "react";
-import { getGallery, addDocument, deleteDocument } from "@/lib/firestore";
 
 export default function AdminGalleryPage() {
   const [photos, setPhotos] = useState([]);
@@ -12,8 +11,9 @@ export default function AdminGalleryPage() {
   useEffect(() => {
     async function load() {
       try {
-        const data = await getGallery();
-        if (data && data.length) setPhotos(data);
+        const res = await fetch("/api/data/gallery");
+        const data = await res.json();
+        if (Array.isArray(data)) setPhotos(data);
       } catch {}
     }
     load();
@@ -25,24 +25,23 @@ export default function AdminGalleryPage() {
     setLoading(true);
     setMessage("");
 
-    const newPhoto = {
-      imageUrl: imageUrl.trim(),
-      caption: caption.trim() || "Ganeshotsava celebration moment",
-      order: photos.length + 1,
-      createdAt: new Date().toISOString(),
-    };
-
     try {
-      const res = await addDocument("gallery", newPhoto);
-      setPhotos([...photos, { id: res.id, ...newPhoto }]);
+      const res = await fetch("/api/data/gallery", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageUrl: imageUrl.trim(),
+          caption: caption.trim() || "Ganeshotsava celebration moment",
+          order: photos.length + 1,
+        }),
+      });
+      const newPhoto = await res.json();
+      setPhotos((prev) => [...prev, newPhoto]);
       setImageUrl("");
       setCaption("");
       setMessage("✅ Photo added to gallery!");
     } catch {
-      setPhotos([...photos, { id: Date.now().toString(), ...newPhoto }]);
-      setImageUrl("");
-      setCaption("");
-      setMessage("✅ Photo added locally!");
+      setMessage("❌ Failed to add photo. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -51,19 +50,19 @@ export default function AdminGalleryPage() {
   async function handleDelete(id) {
     if (!confirm("Are you sure you want to remove this photo?")) return;
     try {
-      await deleteDocument("gallery", id);
-    } catch {}
-    setPhotos(photos.filter((p) => p.id !== id));
+      await fetch(`/api/data/gallery?id=${id}`, { method: "DELETE" });
+      setPhotos((prev) => prev.filter((p) => p.id !== id));
+    } catch {
+      setMessage("❌ Failed to delete. Please try again.");
+    }
   }
 
   return (
     <div>
       <div className="mb-6">
-        <h1 className="font-[var(--font-heading)] text-xl text-white">
-          Photo Gallery Manager
-        </h1>
+        <h1 className="font-[var(--font-heading)] text-xl text-white">Photo Gallery Manager</h1>
         <p className="text-xs text-muted mt-1">
-          Upload and manage photos displayed in the public gallery and lightbox.
+          Add image URLs to display photos in the public gallery. Use any publicly hosted image link.
         </p>
       </div>
 
@@ -82,20 +81,13 @@ export default function AdminGalleryPage() {
 
           {photos.length === 0 ? (
             <div className="py-12 text-center text-xs text-muted border border-dashed border-[rgba(217,169,70,0.2)] rounded-lg">
-              No custom photos added yet. The public site will use beautiful themed placeholders until you add photos here.
+              No photos added yet. Add image URLs using the form on the right.
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               {photos.map((p) => (
-                <div
-                  key={p.id}
-                  className="bg-[#0f0a07] border border-[rgba(255,255,255,0.08)] rounded-lg overflow-hidden group relative"
-                >
-                  <img
-                    src={p.imageUrl}
-                    alt={p.caption || "Gallery"}
-                    className="w-full h-32 object-cover"
-                  />
+                <div key={p.id} className="bg-[#0f0a07] border border-[rgba(255,255,255,0.08)] rounded-lg overflow-hidden group relative">
+                  <img src={p.imageUrl} alt={p.caption || "Gallery"} className="w-full h-32 object-cover" />
                   <div className="p-2.5">
                     <p className="text-[0.75rem] text-[#cfc0ab] truncate">{p.caption}</p>
                   </div>
@@ -113,14 +105,12 @@ export default function AdminGalleryPage() {
 
         {/* Add Form */}
         <div className="lg:col-span-4 bg-[#160d08] border border-[rgba(217,169,70,0.18)] rounded-xl p-5">
-          <h2 className="text-sm font-semibold text-gold-light mb-4">
-            ➕ Add Photo to Gallery
-          </h2>
+          <h2 className="text-sm font-semibold text-gold-light mb-4">➕ Add Photo to Gallery</h2>
 
           <form onSubmit={handleAddPhoto} className="space-y-4">
             <div>
               <label className="block text-xs text-[#cfc0ab] mb-1 font-medium">
-                Image URL (or Firebase Storage URL)
+                Image URL (publicly hosted)
               </label>
               <input
                 type="url"
@@ -133,9 +123,7 @@ export default function AdminGalleryPage() {
             </div>
 
             <div>
-              <label className="block text-xs text-[#cfc0ab] mb-1 font-medium">
-                Photo Caption
-              </label>
+              <label className="block text-xs text-[#cfc0ab] mb-1 font-medium">Photo Caption</label>
               <input
                 type="text"
                 value={caption}
@@ -145,11 +133,7 @@ export default function AdminGalleryPage() {
               />
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn-primary !py-2.5 !px-5 text-xs font-bold w-full disabled:opacity-50"
-            >
+            <button type="submit" disabled={loading} className="btn-primary !py-2.5 !px-5 text-xs font-bold w-full disabled:opacity-50">
               {loading ? "Adding..." : "Add Photo →"}
             </button>
           </form>

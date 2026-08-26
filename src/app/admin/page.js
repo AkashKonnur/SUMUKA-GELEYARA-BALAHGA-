@@ -1,16 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import {
-  getEvents,
-  getAnnouncements,
-  getGallery,
-  getDonationLog,
-} from "@/lib/firestore";
-import {
-  fallbackEvents,
-  fallbackAnnouncements,
-} from "@/lib/fallbackData";
+import { fallbackEvents, fallbackAnnouncements } from "@/lib/fallbackData";
 
 export default function AdminDashboardOverview() {
   const [stats, setStats] = useState({
@@ -24,16 +15,24 @@ export default function AdminDashboardOverview() {
     async function loadStats() {
       try {
         const [evs, anns, gals, logs] = await Promise.allSettled([
-          getEvents(),
-          getAnnouncements(),
-          getGallery(),
-          getDonationLog(),
+          fetch("/api/data/events").then((r) => r.json()),
+          fetch("/api/data/announcements").then((r) => r.json()),
+          fetch("/api/data/gallery").then((r) => r.json()),
+          fetch("/api/data/donationLog").then((r) => r.json()),
         ]);
         setStats({
-          eventsCount: evs.status === "fulfilled" && evs.value?.length ? evs.value.reduce((acc, d) => acc + (d.items?.length || 0), 0) : stats.eventsCount,
-          announcementsCount: anns.status === "fulfilled" ? anns.value.length : stats.announcementsCount,
-          galleryCount: gals.status === "fulfilled" ? gals.value.length : 0,
-          donationsLoggedCount: logs.status === "fulfilled" ? logs.value.length : 0,
+          eventsCount: evs.status === "fulfilled" && Array.isArray(evs.value) && evs.value.length
+            ? evs.value.reduce((acc, d) => acc + (d.items?.length || 0), 0)
+            : stats.eventsCount,
+          announcementsCount: anns.status === "fulfilled" && Array.isArray(anns.value)
+            ? anns.value.length
+            : stats.announcementsCount,
+          galleryCount: gals.status === "fulfilled" && Array.isArray(gals.value)
+            ? gals.value.length
+            : 0,
+          donationsLoggedCount: logs.status === "fulfilled" && Array.isArray(logs.value)
+            ? logs.value.length
+            : 0,
         });
       } catch {}
     }
@@ -52,19 +51,12 @@ export default function AdminDashboardOverview() {
       {/* Header */}
       <div className="mb-8 flex justify-between items-end">
         <div>
-          <h1 className="font-[var(--font-heading)] text-2xl text-white">
-            Welcome to CMS Dashboard
-          </h1>
+          <h1 className="font-[var(--font-heading)] text-2xl text-white">Welcome to CMS Dashboard</h1>
           <p className="text-sm text-muted mt-1">
             Manage your Ganeshotsava 2026 website content easily without writing code.
           </p>
         </div>
-        <a
-          href="/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="btn-outline !py-2 !px-4 text-xs"
-        >
+        <a href="/" target="_blank" rel="noopener noreferrer" className="btn-outline !py-2 !px-4 text-xs">
           View Public Site ↗
         </a>
       </div>
@@ -83,9 +75,7 @@ export default function AdminDashboardOverview() {
                 {c.count}
               </span>
             </div>
-            <h2 className="text-sm font-semibold text-white group-hover:text-gold-light transition-colors">
-              {c.title}
-            </h2>
+            <h2 className="text-sm font-semibold text-white group-hover:text-gold-light transition-colors">{c.title}</h2>
             <p className="text-[0.75rem] text-muted mt-1">{c.desc}</p>
           </Link>
         ))}
@@ -94,9 +84,7 @@ export default function AdminDashboardOverview() {
       {/* Quick Action Guides */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-[#180f0a] border border-[rgba(217,169,70,0.15)] rounded-xl p-6">
-          <h2 className="font-[var(--font-heading)] text-base text-gold-light mb-2">
-            📢 Post Live Update
-          </h2>
+          <h2 className="font-[var(--font-heading)] text-base text-gold-light mb-2">📢 Post Live Update</h2>
           <p className="text-xs text-[#cfc0ab] leading-relaxed mb-4">
             Have a new announcement regarding pooja timings or prasada? Broadcast it instantly to all devotees on the home page.
           </p>
@@ -106,11 +94,9 @@ export default function AdminDashboardOverview() {
         </div>
 
         <div className="bg-[#180f0a] border border-[rgba(217,169,70,0.15)] rounded-xl p-6">
-          <h2 className="font-[var(--font-heading)] text-base text-gold-light mb-2">
-            💳 Manage Donation QR
-          </h2>
+          <h2 className="font-[var(--font-heading)] text-base text-gold-light mb-2">💳 Manage Donation QR</h2>
           <p className="text-xs text-[#cfc0ab] leading-relaxed mb-4">
-            Upload or replace your committee's PhonePe/GPay/UPI QR code image and customize UPI instructions.
+            Upload or replace your committee&apos;s PhonePe/GPay/UPI QR code image and customize UPI instructions.
           </p>
           <Link href="/admin/donation" className="btn-primary !py-2 !px-4 !text-xs">
             Update QR Code →

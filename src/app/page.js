@@ -10,6 +10,7 @@ import Donation from "@/components/public/Donation";
 import Location from "@/components/public/Location";
 import Contact from "@/components/public/Contact";
 import Footer from "@/components/public/Footer";
+import { readData } from "@/lib/data";
 import {
   fallbackSiteInfo,
   fallbackEvents,
@@ -19,9 +20,11 @@ import {
   fallbackLocation,
 } from "@/lib/fallbackData";
 
-export const revalidate = 60; // Revalidate every 60 seconds
+// Revalidate every 30 seconds so public site reflects admin changes quickly
+export const revalidate = 30;
 
 export default async function HomePage() {
+  // Read data directly from the file-based storage (server-side, no Firebase)
   let siteInfo = fallbackSiteInfo;
   let events = fallbackEvents;
   let announcements = fallbackAnnouncements;
@@ -30,45 +33,24 @@ export default async function HomePage() {
   let location = fallbackLocation;
   let gallery = [];
 
-  // Try to load dynamic data from Firestore if available
   try {
-    const {
-      getSiteInfo,
-      getEvents,
-      getAnnouncements,
-      getJourney,
-      getDonation,
-      getLocation,
-      getGallery,
-    } = await import("@/lib/firestore");
+    const dbSiteInfo = readData("siteInfo");
+    const dbEvents = readData("events");
+    const dbAnnouncements = readData("announcements");
+    const dbJourney = readData("journey");
+    const dbDonation = readData("donation");
+    const dbLocation = readData("location");
+    const dbGallery = readData("gallery");
 
-    const [
-      dbSiteInfo,
-      dbEvents,
-      dbAnnouncements,
-      dbJourney,
-      dbDonation,
-      dbLocation,
-      dbGallery,
-    ] = await Promise.allSettled([
-      getSiteInfo(),
-      getEvents(),
-      getAnnouncements(),
-      getJourney(),
-      getDonation(),
-      getLocation(),
-      getGallery(),
-    ]);
-
-    if (dbSiteInfo.status === "fulfilled" && dbSiteInfo.value) siteInfo = { ...fallbackSiteInfo, ...dbSiteInfo.value };
-    if (dbEvents.status === "fulfilled" && dbEvents.value?.length) events = dbEvents.value;
-    if (dbAnnouncements.status === "fulfilled" && dbAnnouncements.value?.length) announcements = dbAnnouncements.value;
-    if (dbJourney.status === "fulfilled" && dbJourney.value?.length) journey = dbJourney.value;
-    if (dbDonation.status === "fulfilled" && dbDonation.value) donation = { ...fallbackDonation, ...dbDonation.value };
-    if (dbLocation.status === "fulfilled" && dbLocation.value) location = { ...fallbackLocation, ...dbLocation.value };
-    if (dbGallery.status === "fulfilled" && dbGallery.value?.length) gallery = dbGallery.value;
+    if (dbSiteInfo && Object.keys(dbSiteInfo).length > 0) siteInfo = { ...fallbackSiteInfo, ...dbSiteInfo };
+    if (Array.isArray(dbEvents) && dbEvents.length > 0) events = dbEvents;
+    if (Array.isArray(dbAnnouncements) && dbAnnouncements.length > 0) announcements = dbAnnouncements;
+    if (Array.isArray(dbJourney) && dbJourney.length > 0) journey = dbJourney;
+    if (dbDonation && Object.keys(dbDonation).length > 0) donation = { ...fallbackDonation, ...dbDonation };
+    if (dbLocation && Object.keys(dbLocation).length > 0) location = { ...fallbackLocation, ...dbLocation };
+    if (Array.isArray(dbGallery)) gallery = dbGallery;
   } catch {
-    // If Firestore fails or not yet connected, use fallbacks seamlessly
+    // If data files aren't available, use beautiful static fallback data
   }
 
   return (

@@ -2,7 +2,7 @@
 
 Official website for **Sumuka Geleyara Balaga's 11th Year Ganeshotsava** — September 14–16, 2026, Kengeri, Bengaluru.
 
-Built with **Next.js 16**, **Firebase**, **Tailwind CSS v4** and **Framer Motion**.
+Built with **Next.js 16**, **Tailwind CSS v4** and **Framer Motion**. Powered by a local JSON file-based database for absolute simplicity (no external database or configuration required!).
 
 ---
 
@@ -48,8 +48,6 @@ ADMIN_EMAIL=admin@yourdomain.com
 ADMIN_PASSWORD=your-secure-password
 ```
 
-> Firebase variables are optional — without them, the site runs on beautiful static fallback data.
-
 ### 4. Run the development server
 
 ```bash
@@ -61,29 +59,26 @@ Open [http://localhost:3000/admin](http://localhost:3000/admin) to access the ad
 
 ---
 
-## 🔐 Admin Login
+## 🔐 Admin Login & Persistence
 
 The admin panel is at `/admin/login`. Login is protected by:
 
-1. **Server-side authentication** via Next.js API route + HttpOnly cookies
-2. **Next.js Edge Middleware** protecting all `/admin/*` routes
-
-**Credentials** are set via environment variables — `ADMIN_EMAIL` and `ADMIN_PASSWORD`.  
-They are **never exposed to the browser** or visible in source code.
-
-**Correct credentials** → Redirected to `/admin` dashboard  
-**Wrong credentials** → Error message shown, access denied  
-**Visiting `/admin` without login** → Auto-redirected to `/admin/login`
+1. **Server-side credentials check** via Next.js API route + HttpOnly session cookies.
+2. **Next.js Edge Middleware** protecting all `/admin/*` routes.
+3. **Local JSON Database** (`src/lib/data.js`): All changes made in the admin panel are saved instantly as JSON files in a local directory (`data/`).
+4. **Render Persistence**: When deploying on Render, a Persistent Disk is attached and mounted under `/data`. All CMS updates are saved to this disk, ensuring changes are kept safely across server restarts, updates, and redeployments.
 
 ---
 
-## ☁️ Deploying to Render
+## ☁️ Deploying to Render (With Data Persistence)
+
+Follow these steps to deploy your website to Render with full persistence for admin changes.
 
 ### Step 1 — Push to GitHub
 
 ```bash
 git add .
-git commit -m "Initial production deployment"
+git commit -m "Configure deployment"
 git push origin main
 ```
 
@@ -96,57 +91,22 @@ git push origin main
    - **Build Command:** `npm install && npm run build`
    - **Start Command:** `npm start`
    - **Runtime:** Node
+   - **Instance Type:** Starter (Recommended to enable Persistent Disks. Disks are not supported on Render's Free tier).
 
 ### Step 3 — Set Environment Variables on Render
 
-In the Render dashboard → **Environment** tab, add:
+In the Render dashboard → **Environment** tab, set:
 
-| Variable | Value | Required? |
+| Variable | Value | Description |
 |---|---|---|
-| `ADMIN_EMAIL` | Your admin email | ✅ Yes |
-| `ADMIN_PASSWORD` | Your secure password | ✅ Yes |
-| `NEXT_PUBLIC_FIREBASE_API_KEY` | From Firebase Console | Optional |
-| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | From Firebase Console | Optional |
-| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | From Firebase Console | Optional |
-| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | From Firebase Console | Optional |
-| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | From Firebase Console | Optional |
-| `NEXT_PUBLIC_FIREBASE_APP_ID` | From Firebase Console | Optional |
-| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | From Google Cloud Console | Optional |
-
-> Without Firebase variables, the site works beautifully with static data. Add Firebase later for live CMS.
+| `ADMIN_EMAIL` | `admin@yourdomain.com` | Your custom admin email login |
+| `ADMIN_PASSWORD` | `your-secure-password` | Your custom admin password |
+| `DATA_DIR` | `/data` | Folder where persistent disk saves CMS files |
+| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | *(Optional)* | Google Maps API key |
 
 ### Step 4 — Deploy
 
-Click **Deploy Web Service**. Your site will be live at:
-```
-https://sumuka-ganeshotsava-2026.onrender.com
-```
-
-### Step 5 — Future Updates
-
-```bash
-# Make your changes locally, then:
-git add .
-git commit -m "Your change description"
-git push origin main
-# Render automatically redeploys — SAME URL, SAME service
-```
-
----
-
-## 🔥 Firebase Setup (Optional — for Live CMS)
-
-Firebase enables the admin panel to save/load content dynamically.
-
-1. Go to [Firebase Console](https://console.firebase.google.com/)
-2. Create a new project
-3. Enable **Firestore**, **Storage**, and **Authentication (Email/Password)**
-4. Go to **Project Settings → Web App** → copy the config
-5. Add values to your `.env.local` and Render environment variables
-6. In **Firebase Authentication → Users**, create your admin user:
-   - Email: same as `ADMIN_EMAIL`
-   - Password: same as `ADMIN_PASSWORD`
-7. Set up Firestore rules from `firestore.rules` in this repo
+Click **Deploy Web Service**. Your site will be live at your custom URL.
 
 ---
 
@@ -154,6 +114,7 @@ Firebase enables the admin panel to save/load content dynamically.
 
 ```
 app/
+├── data/                             ← Local JSON files directory (created on write)
 ├── public/
 │   └── assets/
 │       ├── ganeshotsava-design.png   ← Hero background image
@@ -173,12 +134,14 @@ app/
 │   │   │   ├── donation/page.js      ← Donation settings
 │   │   │   ├── journey/page.js       ← 11-year journey
 │   │   │   ├── location/page.js      ← Map & location
-│   │   │   ├── site-info/page.js     ← Site info & contact
-│   │   │   └── donations-log/page.js ← Private donations log
+│   │   │   └── site-info/page.js     ← Site info & contact
 │   │   └── api/
-│   │       └── auth/
-│   │           ├── login/route.js    ← Server-side login API
-│   │           └── logout/route.js   ← Server-side logout API
+│   │       ├── auth/
+│   │       │   ├── login/route.js    ← Server-side login API
+│   │       │   └── logout/route.js   ← Server-side logout API
+│   │       └── data/
+│   │           └── [collection]/
+│   │               └── route.js      ← Server-side JSON database CRUD routes
 │   ├── components/
 │   │   ├── public/                   ← Public website sections
 │   │   │   ├── Hero.jsx              ← Landing section + background
@@ -192,10 +155,8 @@ app/
 │   │       └── AuthGate.jsx          ← Client-side auth loading state
 │   └── lib/
 │       ├── auth.js                   ← Auth context & login/logout logic
-│       ├── firebase.js               ← Firebase initialization
-│       ├── firestore.js              ← Firestore CRUD helpers
-│       ├── storage.js                ← Firebase Storage helpers
-│       └── fallbackData.js           ← Static data (used without Firebase)
+│       ├── data.js                   ← Local JSON file storage module
+│       └── fallbackData.js           ← Static default data
 ├── middleware.js                     ← Route protection for /admin/*
 ├── next.config.mjs                   ← Next.js configuration
 ├── render.yaml                       ← Render deployment config
@@ -248,25 +209,24 @@ Currently using:
 Change by importing a different Google Font and updating `--font-heading` / `--font-body` in `globals.css`.
 
 ### 📝 Main Text / Hero Content (English & Kannada)
-**Static text (no Firebase):** `src/lib/fallbackData.js`  
-- `heroTaglineEn` / `heroTaglineKn` — subtitle under the title
-- `heroCopyEn` / `heroCopyKn` — description paragraph
-- `about` — About section text  
-
-**With Firebase:** Manage via Admin Dashboard → Site Info & Contact.
+- **Static Defaults:** `src/lib/fallbackData.js`  
+  - `heroTaglineEn` / `heroTaglineKn` — subtitle under the title
+  - `heroCopyEn` / `heroCopyKn` — description paragraph
+  - `about` — About section text  
+- **Admin Dashboard Updates:** Edit directly from the Admin Dashboard under **Site Info & Contact** which overrides defaults and saves to your local/Render storage.
 
 ### 🗺️ Navigation Links
 **File:** `src/components/public/Navbar.jsx`  
 Look for the `navLinks` array to add/remove/rename nav items.
 
 ### 📅 Event Schedule
-**Static:** `src/lib/fallbackData.js` → `fallbackEvents` array  
-**With Firebase:** Admin Dashboard → Events (Day 1/2/3)
+- **Static Defaults:** `src/lib/fallbackData.js` → `fallbackEvents` array  
+- **Admin Dashboard Updates:** Manage via Admin Dashboard → **Events (Day 1/2/3)**
 
 ### 🔑 Admin Email & Password
-**Local development:** `.env.local` file  
-**Render production:** Render Dashboard → Environment tab  
-Variables: `ADMIN_EMAIL` and `ADMIN_PASSWORD`
+- **Local development:** `.env.local` file  
+- **Render production:** Render Dashboard → Environment tab  
+- Variables: `ADMIN_EMAIL` and `ADMIN_PASSWORD`
 
 ### ☁️ Render Environment Variables
 All available variables with explanations are in `.env.example`.  
@@ -282,9 +242,7 @@ Set them in: Render Dashboard → Your Service → Environment.
 | React 19 | UI components |
 | Tailwind CSS v4 | Styling |
 | Framer Motion | Animations |
-| Firebase Firestore | Database (optional) |
-| Firebase Auth | Authentication (optional) |
-| Firebase Storage | Image uploads (optional) |
+| Local File System | JSON Database |
 
 ---
 

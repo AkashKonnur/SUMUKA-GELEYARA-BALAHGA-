@@ -1,6 +1,5 @@
 "use client";
 import { useState, useEffect } from "react";
-import { getJourney, setSingleDoc } from "@/lib/firestore";
 import { fallbackJourney } from "@/lib/fallbackData";
 
 export default function AdminJourneyPage() {
@@ -12,8 +11,9 @@ export default function AdminJourneyPage() {
   useEffect(() => {
     async function load() {
       try {
-        const data = await getJourney();
-        if (data && data.length) setJourney(data);
+        const res = await fetch("/api/data/journey");
+        const data = await res.json();
+        if (Array.isArray(data) && data.length) setJourney(data);
       } catch {}
     }
     load();
@@ -31,12 +31,15 @@ export default function AdminJourneyPage() {
     setSaving(true);
     setMessage("");
     try {
-      for (let i = 0; i < journey.length; i++) {
-        await setSingleDoc("journey", journey[i], `year_${journey[i].year}`);
-      }
+      const res = await fetch("/api/data/journey", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(journey),
+      });
+      if (!res.ok) throw new Error();
       setMessage("✅ 11-Year Journey saved successfully!");
     } catch {
-      setMessage("⚠️ Saved locally (check Firebase configuration).");
+      setMessage("❌ Failed to save. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -46,18 +49,12 @@ export default function AdminJourneyPage() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="font-[var(--font-heading)] text-xl text-white">
-            11-Year Journey Editor
-          </h1>
+          <h1 className="font-[var(--font-heading)] text-xl text-white">11-Year Journey Editor</h1>
           <p className="text-xs text-muted mt-1">
-            Customize the photos and taglines for all 10 past years and the 11th year celebration.
+            Customize the taglines for all 11 years of celebration.
           </p>
         </div>
-        <button
-          onClick={handleSaveAll}
-          disabled={saving}
-          className="btn-primary !py-2.5 !px-5 text-xs font-bold disabled:opacity-50"
-        >
+        <button onClick={handleSaveAll} disabled={saving} className="btn-primary !py-2.5 !px-5 text-xs font-bold disabled:opacity-50">
           {saving ? "Saving..." : "💾 Save All Years"}
         </button>
       </div>
@@ -85,17 +82,13 @@ export default function AdminJourneyPage() {
         ))}
       </div>
 
-      {/* Edit Form */}
       <div className="bg-[#160d08] border border-[rgba(217,169,70,0.18)] rounded-xl p-6 max-w-2xl">
         <h2 className="text-sm font-semibold text-gold-light mb-4">
-          Editing Details for Year {activeCard.year} ({selectedIdx + 1} of 11)
+          Editing Year {activeCard.year} ({selectedIdx + 1} of {journey.length})
         </h2>
-
         <div className="space-y-4">
           <div>
-            <label className="block text-xs text-[#cfc0ab] mb-1 font-medium">
-              Year Tagline & Memory Description
-            </label>
+            <label className="block text-xs text-[#cfc0ab] mb-1 font-medium">Year Tagline &amp; Memory</label>
             <textarea
               rows={3}
               value={activeCard.tagline || ""}
@@ -103,11 +96,8 @@ export default function AdminJourneyPage() {
               className="w-full bg-[#0c0704] border border-[rgba(217,169,70,0.25)] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-gold"
             />
           </div>
-
           <div>
-            <label className="block text-xs text-[#cfc0ab] mb-1 font-medium">
-              Photo URL for this year (Optional)
-            </label>
+            <label className="block text-xs text-[#cfc0ab] mb-1 font-medium">Photo URL for this year (Optional)</label>
             <input
               type="url"
               value={activeCard.photo || ""}
@@ -116,15 +106,10 @@ export default function AdminJourneyPage() {
               className="w-full bg-[#0c0704] border border-[rgba(217,169,70,0.25)] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-gold"
             />
           </div>
-
           {activeCard.photo && (
             <div>
               <p className="text-xs text-muted mb-1">Preview:</p>
-              <img
-                src={activeCard.photo}
-                alt={`Year ${activeCard.year}`}
-                className="max-h-40 rounded-lg object-cover border border-gold/30"
-              />
+              <img src={activeCard.photo} alt={`Year ${activeCard.year}`} className="max-h-40 rounded-lg object-cover border border-gold/30" />
             </div>
           )}
         </div>
