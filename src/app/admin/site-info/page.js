@@ -90,6 +90,24 @@ export default function AdminSiteInfoPage() {
             </div>
           </div>
 
+          <div className="pt-2">
+            <label className="block text-xs text-[#cfc0ab] mb-1 font-medium">🖼️ Hero Background Image URL</label>
+            <input
+              type="url"
+              value={data.backgroundImageUrl || ""}
+              onChange={(e) => setData({ ...data, backgroundImageUrl: e.target.value })}
+              placeholder="https://... (leave blank to use default image)"
+              className="w-full bg-[#0c0704] border border-[rgba(217,169,70,0.25)] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-gold"
+            />
+            <p className="text-[0.7rem] text-muted mt-1">Paste a direct link to any image. Leave empty to use the default background.</p>
+            {data.backgroundImageUrl && (
+              <div className="mt-2">
+                <p className="text-xs text-muted mb-1">Preview:</p>
+                <img src={data.backgroundImageUrl} alt="Background preview" className="max-h-32 rounded-lg object-cover border border-gold/30" />
+              </div>
+            )}
+          </div>
+
           <button type="submit" disabled={loading} className="btn-primary !py-2.5 !px-6 text-xs font-bold disabled:opacity-50">
             {loading ? "Saving Changes..." : "Save Site Details →"}
           </button>

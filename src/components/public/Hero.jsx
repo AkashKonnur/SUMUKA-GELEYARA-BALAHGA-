@@ -33,10 +33,12 @@ export default function Hero({ siteInfo }) {
       id="home"
       className="relative min-h-[100vh] md:min-h-[770px] flex items-center overflow-hidden"
     >
-      {/* Background Image */}
+      {/* Background Image — admin-controllable via siteInfo.backgroundImageUrl */}
       <div
         className="absolute inset-0 bg-cover bg-center"
-        style={{ backgroundImage: "url('/assets/ganeshotsava-design.png')" }}
+        style={{
+          backgroundImage: `url('${data.backgroundImageUrl || "/assets/ganeshotsava-design.png"}')`
+        }}
       />
 
       {/* Gradient Overlay */}
