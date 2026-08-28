@@ -1,14 +1,25 @@
 # ════════════════════════════════════════════════════════════════════════
-#  Render Deployment Configuration (100% Free Tier Compatible)
+#  Render Deployment Configuration (Free Tier Compatible)
 #  Sumuka Geleyara Balaga — Ganeshotsava 2026 Website
 #
 #  HOW TO DEPLOY:
 #  1. Push this repo to GitHub
 #  2. Go to https://dashboard.render.com → New → Web Service
 #  3. Connect your GitHub repository
-#  4. Render auto-detects this file and pre-fills Free tier settings
-#  5. Add ADMIN_EMAIL & ADMIN_PASSWORD in Render dashboard Environment tab
+#  4. Render auto-detects this file
+#  5. REQUIRED: Add the following 3 env vars in Render dashboard → Environment:
+#       ADMIN_EMAIL      — your admin login email
+#       ADMIN_PASSWORD   — your admin login password
+#       MONGODB_URI      — your MongoDB Atlas connection string
+#       (see .env.example for instructions on getting MONGODB_URI)
 #  6. Click Deploy
+#
+#  HEALTH CHECK (keep service alive on free tier):
+#  After deploying, go to cron-job.org (free) and create a cron job:
+#  URL: https://your-app.onrender.com/api/health
+#  Schedule: every 10 minutes
+#  This prevents the free Render instance from sleeping.
+#  NOTE: Data is stored in MongoDB — it persists even when Render sleeps.
 # ════════════════════════════════════════════════════════════════════════
 
 services:
@@ -21,6 +32,9 @@ services:
     buildCommand: npm install && npm run build
     startCommand: npm start
 
+    # ── Health Check ─────────────────────────────────────────────────
+    healthCheckPath: /api/health
+
     # ── Environment ──────────────────────────────────────────────────
     envVars:
       # Node environment
@@ -32,11 +46,18 @@ services:
         generateValue: false
 
       # ── REQUIRED: Admin Login Credentials ────────────────────────
-      # Set your custom admin email and password in Render's Environment tab
+      # Set these in the Render dashboard → Environment tab
       - key: ADMIN_EMAIL
         sync: false
 
       - key: ADMIN_PASSWORD
+        sync: false
+
+      # ── REQUIRED: MongoDB Atlas Connection String ─────────────────
+      # Persistent storage for all CMS data.
+      # Get a free M0 cluster at https://cloud.mongodb.com
+      # Format: mongodb+srv://user:pass@cluster.xxxxx.mongodb.net/...
+      - key: MONGODB_URI
         sync: false
 
       # ── OPTIONAL: Google Maps ────────────────────────────────────

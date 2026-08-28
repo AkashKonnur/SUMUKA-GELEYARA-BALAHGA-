@@ -1,230 +1,182 @@
-# ಸುಮುಖ ಗೆಳೆಯರ ಬಳಗ — Ganeshotsava 2026 🙏
+# Sumuka Geleyara Balaga — Ganeshotsava 2026 Website
 
-Official website for **Sumuka Geleyara Balaga's 11th Year Ganeshotsava** — September 14–16, 2026, Kengeri, Bengaluru.
-
-Built with **Next.js 16**, **Tailwind CSS v4** and **Framer Motion**. Zero external databases, zero Firebase, 100% self-contained and configured for **Render Free ($0)** hosting.
+Official website for **Sumuka Geleyara Balaga's 11th Ganeshotsava** celebration.
 
 ---
 
-## 🌐 Live Website Structure
+## Architecture
 
-| URL | Description |
-|---|---|
-| `yoursite.onrender.com/` | Public website (home, events, gallery, etc.) |
-| `yoursite.onrender.com/admin/login` | Admin login |
-| `yoursite.onrender.com/admin` | Admin CMS dashboard (protected) |
-| `yoursite.onrender.com/admin/events` | Manage day-wise event schedule |
-| `yoursite.onrender.com/admin/announcements` | Live announcements |
-| `yoursite.onrender.com/admin/gallery` | Photo gallery |
-| `yoursite.onrender.com/admin/donation` | Donation QR & UPI settings |
+- **Framework**: Next.js 16 (App Router, SSR)
+- **Database**: MongoDB Atlas (free M0 tier) — all CMS data is permanently stored here
+- **Hosting**: Render Free Web Service
+- **Admin CMS**: Built-in at `/admin`
+- **Authentication**: Environment-variable credentials + HttpOnly session cookies
+
+### Why MongoDB Atlas?
+Render's free tier uses an **ephemeral filesystem** — any file written to disk is wiped when the service restarts, sleeps, or redeploys. MongoDB Atlas (free M0 cluster) stores all CMS data externally, independently of Render. Data persists permanently across all restarts.
 
 ---
 
-## 🚀 Quick Start (Local Development)
+## Data Flow
 
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git
-cd YOUR_REPO_NAME
+```
+Admin CMS → POST /api/data/[collection] → MongoDB Atlas → public site reads on next request
 ```
 
-### 2. Install dependencies
+The public home page revalidates every 30 seconds. After an admin save, the change appears on the public site within ~30 seconds at most.
 
-```bash
-npm install
+---
+
+## Required Environment Variables
+
+Set these in **Render Dashboard → Your Service → Environment**:
+
+| Variable | Required | Description |
+|---|---|---|
+| `ADMIN_EMAIL` | ✅ Required | Admin login email |
+| `ADMIN_PASSWORD` | ✅ Required | Admin login password (strong) |
+| `MONGODB_URI` | ✅ Required | MongoDB Atlas connection string |
+| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | Optional | Enables styled Google Maps embed |
+
+### How to get MONGODB_URI (free, no credit card)
+
+1. Go to [https://cloud.mongodb.com](https://cloud.mongodb.com) and create a free account
+2. Create a new **FREE cluster** (M0 tier — always free)
+3. Create a database user: **Database Access** → Add New Database User → set username + password
+4. Whitelist all IPs: **Network Access** → Add IP Address → `0.0.0.0/0` (Allow from anywhere)
+5. Get connection string: **Database** → Connect → Drivers → Node.js (copy the string)
+6. Replace `<password>` with your database user's password
+7. Paste into Render's `MONGODB_URI` environment variable
+
+**Example format:**
+```
+mongodb+srv://myuser:mypassword@cluster0.abc123.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
 ```
 
-### 3. Set up environment variables
+---
+
+## Deploying to Render
+
+1. Push the `app/` folder to GitHub (`main` branch)
+2. Go to [https://dashboard.render.com](https://dashboard.render.com) → New → Web Service
+3. Connect your GitHub repo
+4. Render auto-detects `render.yaml` — build/start commands are pre-filled
+5. Add the 3 required environment variables in the **Environment** tab
+6. Click **Deploy**
+
+### After first deploy
+- Visit `https://your-app.onrender.com/admin/login` to access the CMS
+- Log in with your `ADMIN_EMAIL` / `ADMIN_PASSWORD`
+
+---
+
+## Keeping Render Alive (free tier)
+
+Render Free instances sleep after 15 minutes of inactivity. Set up a free cron ping:
+
+1. Go to [https://cron-job.org](https://cron-job.org) — free account
+2. Create a new cron job:
+   - **URL**: `https://your-app.onrender.com/api/health`
+   - **Schedule**: every 10 minutes
+3. Save
+
+> **Note**: This keeps the server responsive, but data persistence is handled by MongoDB — it survives whether or not the server is awake.
+
+---
+
+## Local Development
 
 ```bash
+cd app/
 cp .env.example .env.local
-```
+# Fill in ADMIN_EMAIL, ADMIN_PASSWORD, and MONGODB_URI in .env.local
 
-Open `.env.local` and set your admin login:
-
-```env
-ADMIN_EMAIL=admin@yourdomain.com
-ADMIN_PASSWORD=your-secure-password
-```
-
-### 4. Run the development server
-
-```bash
+npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to view the public site.
-Open [http://localhost:3000/admin](http://localhost:3000/admin) to access the admin dashboard.
+Open [http://localhost:3000](http://localhost:3000) for the public site.
+Open [http://localhost:3000/admin](http://localhost:3000/admin) for the CMS.
 
 ---
 
-## 🔐 Admin Authentication & Data on Render Free Tier
+## Admin CMS Pages
 
-### Security
-* Protected with Next.js **Edge Middleware** (`middleware.js`).
-* Verifies credentials against `ADMIN_EMAIL` and `ADMIN_PASSWORD` server-side via Next.js route handlers.
-* Manages sessions using secure, tamper-proof **HttpOnly cookies**.
-
-### How Data Works on Render Free Tier
-* **Render Free Plan Ephemeral Storage**: Render Free tier instances do not include a permanent disk. Any live changes made through the Admin Panel are stored on disk for the active lifespan of the container.
-* **Persistent / Default Updates**: The site is pre-configured with default content in `src/lib/fallbackData.js`. If you want permanent updates to event timings, announcements, or contact info that persist forever across all Free-tier container restarts, you can simply edit `src/lib/fallbackData.js` and push to GitHub!
-
----
-
-## ☁️ Deploying on Render (100% Free Plan)
-
-### Step 1 — Push to GitHub
-
-```bash
-git add .
-git commit -m "Ready for Render Free deployment"
-git push origin main
-```
-
-### Step 2 — Create Web Service on Render
-
-1. Go to [dashboard.render.com](https://dashboard.render.com).
-2. Click **New +** → **Web Service**.
-3. Connect your GitHub repository (`AkashKonnur/SUMUKA-GELEYARA-BALAHGA-`).
-4. Render will automatically read `render.yaml` and configure:
-   * **Plan:** Free ($0/month)
-   * **Build Command:** `npm install && npm run build`
-   * **Start Command:** `npm start`
-
-### Step 3 — Set Admin Credentials in Render
-
-In your Render Service Dashboard → **Environment** tab, add:
-
-| Variable | Value | Description |
+| Page | URL | Description |
 |---|---|---|
-| `ADMIN_EMAIL` | `your_email@example.com` | Your admin email for logging into `/admin` |
-| `ADMIN_PASSWORD` | `your_secure_password` | Your admin password |
-| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | *(Optional)* | For custom Google Maps styling |
-
-### Step 4 — Deploy
-
-Click **Deploy Web Service**. Your website will be live in 2–3 minutes at your Render URL!
+| Dashboard | `/admin` | Stats overview |
+| Events | `/admin/events` | Day 1/2/3 schedule |
+| Announcements | `/admin/announcements` | Live updates broadcast |
+| Gallery | `/admin/gallery` | Photo gallery (URL or upload) |
+| 11-Year Journey | `/admin/journey` | Year-by-year taglines + photos |
+| Donation Settings | `/admin/donation` | UPI ID, QR code, instructions |
+| Donation Dashboard | `/admin/donations-log` | All donations, confirm/cancel, PDF export |
+| Location | `/admin/location` | Venue address + map |
+| Site Info | `/admin/site-info` | About, hero text, contact, background |
 
 ---
 
-## 📁 Project Structure
+## Donation System
+
+### Public Flow
+1. Devotee visits the Donation section
+2. Selects a quick amount (₹51, ₹101, ₹251, ₹501, ₹1001, ₹2501) or enters a custom amount
+3. Optionally enters their name
+4. Clicks **Pay via UPI** → UPI deep link opens PhonePe, GPay, Paytm, or any UPI app
+5. Completes payment in UPI app
+6. Website shows "Thank you" confirmation
+
+### Why no automatic payment verification?
+Automatic verified payment callbacks require:
+- Merchant registration with a payment gateway (Razorpay, PayU, Cashfree, etc.)
+- PAN/GST/bank account for KYC
+- Transaction fees (typically 1.5–2%)
+
+For a community event at ₹0 cost, the UPI deep link approach is the best option:
+- Completely free
+- Opens any UPI app with pre-filled amount and UPI ID
+- No merchant account required
+- Admin verifies from their UPI app and marks donations as "confirmed"
+
+**Future upgrade**: Add Razorpay (2% per transaction, merchant onboarding required) for automatic verification.
+
+---
+
+## Security Notes
+
+- Admin password is never stored in source code or exposed to the browser
+- All admin API routes require the `admin_session` HttpOnly cookie
+- MongoDB credentials are server-side only (never sent to the browser)
+- File uploads are validated (type + size) before saving
+- Do not commit `.env.local` to Git (it is in `.gitignore`)
+
+---
+
+## Project Structure
 
 ```
 app/
-├── data/                             ← Local JSON files directory
-├── public/
-│   └── assets/
-│       ├── ganeshotsava-design.png   ← Hero background image
-│       └── IMG_4339.png              ← Original provided image
 ├── src/
 │   ├── app/
-│   │   ├── page.js                   ← Public homepage
-│   │   ├── layout.js                 ← Root layout (fonts, meta)
-│   │   ├── globals.css               ← All CSS: tokens, animations, utilities
-│   │   ├── admin/
-│   │   │   ├── layout.js             ← Admin layout (sidebar + auth)
-│   │   │   ├── page.js               ← Admin dashboard overview
-│   │   │   ├── login/page.js         ← Admin login page
-│   │   │   ├── events/page.js        ← Manage events
-│   │   │   ├── announcements/page.js ← Live announcements
-│   │   │   ├── gallery/page.js       ← Photo gallery
-│   │   │   ├── donation/page.js      ← Donation settings
-│   │   │   ├── journey/page.js       ← 11-year journey
-│   │   │   ├── location/page.js      ← Map & location
-│   │   │   └── site-info/page.js     ← Site info & contact
-│   │   └── api/
-│   │       ├── auth/
-│   │       │   ├── login/route.js    ← Server-side login API
-│   │       │   └── logout/route.js   ← Server-side logout API
-│   │       └── data/
-│   │           └── [collection]/
-│   │               └── route.js      ← Server-side JSON storage API
+│   │   ├── page.js                    # Public home page (SSR)
+│   │   ├── api/
+│   │   │   ├── auth/login/            # Admin login API
+│   │   │   ├── auth/logout/           # Admin logout API
+│   │   │   ├── data/[collection]/     # Generic CMS data CRUD API
+│   │   │   ├── donations/             # Public donation recording
+│   │   │   ├── admin/donations/[id]/  # Admin donation status update
+│   │   │   ├── upload/                # File upload API
+│   │   │   └── health/                # Health check endpoint
+│   │   └── admin/                     # All admin CMS pages
 │   ├── components/
-│   │   ├── public/                   ← Public website sections
-│   │   │   ├── Hero.jsx              ← Landing section + background
-│   │   │   ├── Navbar.jsx            ← Navigation bar
-│   │   │   ├── Events.jsx            ← Day-wise event schedule
-│   │   │   ├── Gallery.jsx           ← Photo gallery grid
-│   │   │   ├── Donation.jsx          ← UPI/QR donation section
-│   │   │   └── ...
-│   │   └── admin/
-│   │       ├── AdminSidebar.jsx      ← Admin navigation sidebar
-│   │       └── AuthGate.jsx          ← Client-side auth state
+│   │   ├── public/                    # Public site components
+│   │   └── admin/                     # Admin UI components
 │   └── lib/
-│       ├── auth.js                   ← Auth context & login/logout logic
-│       ├── data.js                   ← Local JSON file storage module
-│       └── fallbackData.js           ← Default static data
-├── middleware.js                     ← Route protection for /admin/*
-├── next.config.mjs                   ← Next.js configuration
-├── render.yaml                       ← Render deployment config (Free plan)
-├── .env.example                      ← Environment variables template
-├── .gitignore                        ← Git ignore rules
-└── package.json                      ← Dependencies & scripts
+│       ├── db.js                      # MongoDB connection singleton
+│       ├── data.js                    # readData/writeData (MongoDB-backed)
+│       ├── auth.js                    # Client-side auth context
+│       └── fallbackData.js            # Default data when DB unavailable
+├── .env.example                       # Template for required env vars
+├── render.yaml                        # Render deployment config
+└── package.json
 ```
-
----
-
-## 🎨 Customization Guide
-
-Exact file locations for every customizable element:
-
-### 🖼️ Background Image (First Page / Hero Section)
-**File:** `src/components/public/Hero.jsx` — line 39  
-**Current image:** `public/assets/ganeshotsava-design.png`  
-**To change:** Replace the file `public/assets/ganeshotsava-design.png` with your new image (keep the same filename), OR update the path in `Hero.jsx`:
-```jsx
-style={{ backgroundImage: "url('/assets/YOUR_NEW_IMAGE.png')" }}
-```
-
-### 🖼️ Other Images
-- **Gallery photos:** Managed via Admin Dashboard → `yoursite.com/admin/gallery`
-- **Donation QR code:** Managed via Admin Dashboard → `yoursite.com/admin/donation`
-
-### 🏷️ Logo / Organization Name
-**File:** `src/components/public/Navbar.jsx`  
-Look for the brand/logo section (the "ॐ" mark and Kannada text).  
-**Also in:** `src/components/admin/AdminSidebar.jsx` — the "ಸುಮುಖ ಗೆಳೆಯರ ಬಳಗ" heading.
-
-### 🎨 Colors & Design Theme
-**File:** `src/app/globals.css` — lines 4–23 (CSS variables)
-```css
-:root {
-  --gold: #d9a946;           /* Main gold accent */
-  --gold-light: #f4d88b;     /* Light gold */
-  --maroon: #43150f;         /* Maroon/deep red */
-  --cream: #f7eedc;          /* Page background */
-  --ink: #130d09;            /* Darkest color */
-}
-```
-
-### 🔤 Fonts
-**File:** `src/app/layout.js` — lines 1–23  
-Currently using:
-- `Cinzel` — headings (English)
-- `Inter` — body text
-- `Noto Sans Kannada` — Kannada text  
-Change by importing a different Google Font and updating `--font-heading` / `--font-body` in `globals.css`.
-
-### 📝 Main Text & Default Data
-**File:** `src/lib/fallbackData.js`  
-- `heroTaglineEn` / `heroTaglineKn` — subtitle under the title
-- `heroCopyEn` / `heroCopyKn` — description paragraph
-- `about` — About section text
-- `fallbackEvents` — Schedule for Day 1, 2, and 3
-- `fallbackAnnouncements` — Live updates
-- `fallbackJourney` — 11-year journey text
-- `fallbackLocation` — Address and landmark
-- `fallbackDonation` — UPI ID and instructions
-
-### 🔑 Admin Email & Password
-- **Local development:** `.env.local` file  
-- **Render production:** Render Dashboard → Environment tab  
-- Variables: `ADMIN_EMAIL` and `ADMIN_PASSWORD`
-
----
-
-## 📄 License
-
-Private project — Sumuka Geleyara Balaga, Bengaluru.  
-All rights reserved.

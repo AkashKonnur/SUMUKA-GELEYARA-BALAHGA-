@@ -20,11 +20,13 @@ import {
   fallbackLocation,
 } from "@/lib/fallbackData";
 
-// Revalidate every 30 seconds so public site reflects admin changes quickly
+// Revalidate every 30 seconds so public site reflects admin changes quickly.
+// After an admin save, the next visitor (within 30s) will trigger a fresh DB read.
 export const revalidate = 30;
 
 export default async function HomePage() {
-  // Read data directly from the file-based storage (server-side, no Firebase)
+  // Read data from persistent MongoDB storage (server-side).
+  // Falls back to beautiful static data if DB is unavailable.
   let siteInfo = fallbackSiteInfo;
   let events = fallbackEvents;
   let announcements = fallbackAnnouncements;
@@ -34,13 +36,23 @@ export default async function HomePage() {
   let gallery = [];
 
   try {
-    const dbSiteInfo = readData("siteInfo");
-    const dbEvents = readData("events");
-    const dbAnnouncements = readData("announcements");
-    const dbJourney = readData("journey");
-    const dbDonation = readData("donation");
-    const dbLocation = readData("location");
-    const dbGallery = readData("gallery");
+    const [
+      dbSiteInfo,
+      dbEvents,
+      dbAnnouncements,
+      dbJourney,
+      dbDonation,
+      dbLocation,
+      dbGallery,
+    ] = await Promise.all([
+      readData("siteInfo"),
+      readData("events"),
+      readData("announcements"),
+      readData("journey"),
+      readData("donation"),
+      readData("location"),
+      readData("gallery"),
+    ]);
 
     if (dbSiteInfo && Object.keys(dbSiteInfo).length > 0) siteInfo = { ...fallbackSiteInfo, ...dbSiteInfo };
     if (Array.isArray(dbEvents) && dbEvents.length > 0) events = dbEvents;
@@ -50,7 +62,7 @@ export default async function HomePage() {
     if (dbLocation && Object.keys(dbLocation).length > 0) location = { ...fallbackLocation, ...dbLocation };
     if (Array.isArray(dbGallery)) gallery = dbGallery;
   } catch {
-    // If data files aren't available, use beautiful static fallback data
+    // If MongoDB is unavailable, the public site renders using fallback data.
   }
 
   return (

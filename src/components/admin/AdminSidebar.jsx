@@ -10,7 +10,7 @@ const navItems = [
   { label: "Photo Gallery", href: "/admin/gallery", icon: "📸" },
   { label: "11-Year Journey", href: "/admin/journey", icon: "⏳" },
   { label: "Donation QR & UPI", href: "/admin/donation", icon: "💳" },
-  { label: "Donations Log (Private)", href: "/admin/donations-log", icon: "📝" },
+  { label: "Donation Dashboard", href: "/admin/donations-log", icon: "💸" },
   { label: "Map & Location", href: "/admin/location", icon: "📍" },
   { label: "Site Info & Contact", href: "/admin/site-info", icon: "⚙️" },
 ];

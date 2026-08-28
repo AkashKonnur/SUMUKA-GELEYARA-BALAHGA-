@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { readData, writeData } from "@/lib/data";
+import { readData, writeData, appendItem, deleteItem, mergeData } from "@/lib/data";
 
 // Collections that store arrays of items
 const ARRAY_COLLECTIONS = ["announcements", "gallery", "events", "journey", "donationLog"];
@@ -25,8 +25,12 @@ export async function GET(request, { params }) {
     return NextResponse.json({ error: "Unknown collection." }, { status: 404 });
   }
 
-  const data = readData(collection);
-  return NextResponse.json(data);
+  try {
+    const data = await readData(collection);
+    return NextResponse.json(data);
+  } catch {
+    return NextResponse.json({ error: "Failed to read data." }, { status: 500 });
+  }
 }
 
 /**
@@ -43,28 +47,32 @@ export async function POST(request, { params }) {
 
   const body = await request.json();
 
-  if (OBJECT_COLLECTIONS.includes(collection)) {
-    // For single-object collections: merge with existing data
-    const existing = readData(collection);
-    const updated = { ...existing, ...body, updatedAt: new Date().toISOString() };
-    writeData(collection, updated);
-    return NextResponse.json(updated);
-  }
+  try {
+    if (OBJECT_COLLECTIONS.includes(collection)) {
+      // For single-object collections: merge with existing data
+      const updated = await mergeData(collection, body);
+      return NextResponse.json(updated);
+    }
 
-  if (ARRAY_COLLECTIONS.includes(collection)) {
-    // For array collections: add new item with generated id
-    const existing = readData(collection);
-    const newItem = {
-      ...body,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString(),
-    };
-    const updated = [newItem, ...(Array.isArray(existing) ? existing : [])];
-    writeData(collection, updated);
-    return NextResponse.json(newItem);
-  }
+    if (ARRAY_COLLECTIONS.includes(collection)) {
+      // For array collections: add new item with generated id
+      const newItem = {
+        ...body,
+        id: Date.now().toString(),
+        createdAt: new Date().toISOString(),
+      };
+      await appendItem(collection, newItem);
+      return NextResponse.json(newItem);
+    }
 
-  return NextResponse.json({ error: "Unknown collection." }, { status: 404 });
+    return NextResponse.json({ error: "Unknown collection." }, { status: 404 });
+  } catch (err) {
+    console.error(`POST /api/data/${collection} error:`, err);
+    return NextResponse.json(
+      { error: err.message || "Failed to save data." },
+      { status: 500 }
+    );
+  }
 }
 
 /**
@@ -79,8 +87,17 @@ export async function PUT(request, { params }) {
   }
 
   const body = await request.json();
-  writeData(collection, body);
-  return NextResponse.json({ success: true });
+
+  try {
+    await writeData(collection, body);
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error(`PUT /api/data/${collection} error:`, err);
+    return NextResponse.json(
+      { error: err.message || "Failed to save data." },
+      { status: 500 }
+    );
+  }
 }
 
 /**
@@ -105,8 +122,14 @@ export async function DELETE(request, { params }) {
     return NextResponse.json({ error: "Cannot delete from object collection." }, { status: 400 });
   }
 
-  const existing = readData(collection);
-  const updated = Array.isArray(existing) ? existing.filter((item) => item.id !== id) : existing;
-  writeData(collection, updated);
-  return NextResponse.json({ success: true });
+  try {
+    await deleteItem(collection, id);
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error(`DELETE /api/data/${collection} error:`, err);
+    return NextResponse.json(
+      { error: err.message || "Failed to delete item." },
+      { status: 500 }
+    );
+  }
 }
