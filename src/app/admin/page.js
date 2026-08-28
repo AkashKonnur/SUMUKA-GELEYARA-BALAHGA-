@@ -14,11 +14,13 @@ export default function AdminDashboardOverview() {
   useEffect(() => {
     async function loadStats() {
       try {
+        const t = Date.now();
+        const fetchOpts = { cache: "no-store", headers: { "Cache-Control": "no-cache" } };
         const [evs, anns, gals, logs] = await Promise.allSettled([
-          fetch("/api/data/events").then((r) => r.json()),
-          fetch("/api/data/announcements").then((r) => r.json()),
-          fetch("/api/data/gallery").then((r) => r.json()),
-          fetch("/api/data/donationLog").then((r) => r.json()),
+          fetch(`/api/data/events?t=${t}`, fetchOpts).then((r) => r.json()),
+          fetch(`/api/data/announcements?t=${t}`, fetchOpts).then((r) => r.json()),
+          fetch(`/api/data/gallery?t=${t}`, fetchOpts).then((r) => r.json()),
+          fetch(`/api/data/donationLog?t=${t}`, fetchOpts).then((r) => r.json()),
         ]);
         setStats({
           eventsCount: evs.status === "fulfilled" && Array.isArray(evs.value) && evs.value.length

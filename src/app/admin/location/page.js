@@ -10,10 +10,17 @@ export default function AdminLocationPage() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch("/api/data/location");
-        const d = await res.json();
-        if (d && Object.keys(d).length > 0) setData({ ...fallbackLocation, ...d });
-      } catch {}
+        const res = await fetch(`/api/data/location?t=${Date.now()}`, {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache" },
+        });
+        if (res.ok) {
+          const d = await res.json();
+          if (d && Object.keys(d).length > 0) setData({ ...fallbackLocation, ...d });
+        }
+      } catch (err) {
+        console.error("Failed to load location:", err);
+      }
     }
     load();
   }, []);
@@ -28,10 +35,15 @@ export default function AdminLocationPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!res.ok) throw new Error();
-      setMessage("✅ Location address updated successfully on live map!");
-    } catch {
-      setMessage("❌ Failed to save. Please try again.");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to save");
+      }
+      const updated = await res.json();
+      setData(prev => ({ ...prev, ...updated }));
+      setMessage("✅ Location address updated permanently! Values will persist across refreshes.");
+    } catch (err) {
+      setMessage(`❌ Failed to save: ${err.message || "Please try again."}`);
     } finally {
       setLoading(false);
     }

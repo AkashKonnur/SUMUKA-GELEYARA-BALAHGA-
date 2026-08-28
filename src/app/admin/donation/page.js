@@ -10,10 +10,17 @@ export default function AdminDonationPage() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch("/api/data/donation");
-        const d = await res.json();
-        if (d && Object.keys(d).length > 0) setData({ ...fallbackDonation, ...d });
-      } catch {}
+        const res = await fetch(`/api/data/donation?t=${Date.now()}`, {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache" },
+        });
+        if (res.ok) {
+          const d = await res.json();
+          if (d && Object.keys(d).length > 0) setData({ ...fallbackDonation, ...d });
+        }
+      } catch (err) {
+        console.error("Failed to load donation settings:", err);
+      }
     }
     load();
   }, []);
@@ -28,10 +35,15 @@ export default function AdminDonationPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!res.ok) throw new Error();
-      setMessage("✅ Donation QR and UPI details updated successfully!");
-    } catch {
-      setMessage("❌ Failed to save. Please try again.");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to save");
+      }
+      const updated = await res.json();
+      setData(prev => ({ ...prev, ...updated }));
+      setMessage("✅ Donation QR and UPI details updated permanently! Values will persist across refreshes.");
+    } catch (err) {
+      setMessage(`❌ Failed to save: ${err.message || "Please try again."}`);
     } finally {
       setLoading(false);
     }
@@ -64,7 +76,7 @@ export default function AdminDonationPage() {
                 placeholder="https://... (Direct image link to your UPI QR)"
                 className="w-full bg-[#0c0704] border border-[rgba(217,169,70,0.25)] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-gold"
               />
-              <p className="text-[0.7rem] text-muted mt-1">Paste a direct link to your QR image (hosted on Google Drive, Imgur, etc.)</p>
+              <p className="text-[0.7rem] text-muted mt-1">Paste a direct link to your QR image (hosted on Google Drive, Imgur, Cloudinary, etc.)</p>
             </div>
 
             <div>
@@ -109,7 +121,12 @@ export default function AdminDonationPage() {
           <h2 className="text-xs font-bold text-gold-light tracking-wider uppercase mb-4">Live Preview</h2>
           <div className="bg-white rounded-xl p-4 inline-block shadow-lg max-w-[240px]">
             {data.qrImageUrl ? (
-              <img src={data.qrImageUrl} alt="QR Preview" className="w-full h-auto object-contain" />
+              <img
+                src={data.qrImageUrl}
+                alt="QR Preview"
+                className="w-full h-auto object-contain max-h-52"
+                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+              />
             ) : (
               <div className="w-48 h-48 border-2 border-dashed border-gray-300 rounded flex items-center justify-center text-xs text-gray-500">
                 No QR code set

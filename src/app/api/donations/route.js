@@ -1,19 +1,19 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { appendItem } from "@/lib/data";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+const NO_CACHE_HEADERS = {
+  "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+  "Pragma": "no-cache",
+  "Expires": "0",
+};
 
 /**
  * POST /api/donations
  * Public endpoint — records a donation initiation event.
- *
- * Called from the public Donation component when a user clicks "Pay via UPI".
- * Creates a record with status "initiated" so admins can see payment attempts
- * and manually mark them as confirmed after checking their UPI app.
- *
- * Body:
- *   { donorName?: string, amount: number, upiId: string, note?: string }
- *
- * Security: No sensitive payment data is stored. Only donor name (optional),
- * amount, and initiation timestamp. UPI PIN / card details are never touched.
  */
 export async function POST(request) {
   try {
@@ -21,7 +21,7 @@ export async function POST(request) {
     const { donorName, amount, upiId, note } = body;
 
     if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
-      return NextResponse.json({ error: "Valid amount is required." }, { status: 400 });
+      return NextResponse.json({ error: "Valid amount is required." }, { status: 400, headers: NO_CACHE_HEADERS });
     }
 
     const record = {
@@ -30,18 +30,24 @@ export async function POST(request) {
       amount: Number(amount),
       upiId: upiId || "",
       note: (note || "").trim() || "UPI donation via website",
-      status: "initiated", // Admin manually updates to "confirmed" after verification
+      status: "initiated",
       loggedAt: new Date().toISOString(),
       createdAt: new Date().toISOString(),
     };
 
     await appendItem("donationLog", record);
-    return NextResponse.json({ success: true, id: record.id });
+
+    try {
+      revalidatePath("/", "layout");
+      revalidatePath("/");
+    } catch {}
+
+    return NextResponse.json({ success: true, id: record.id }, { headers: NO_CACHE_HEADERS });
   } catch (err) {
     console.error("POST /api/donations error:", err);
     return NextResponse.json(
       { error: "Failed to record donation. Please try again." },
-      { status: 500 }
+      { status: 500, headers: NO_CACHE_HEADERS }
     );
   }
 }

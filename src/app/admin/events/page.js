@@ -13,15 +13,22 @@ export default function AdminEventsPage() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch("/api/data/events");
-        const data = await res.json();
-        if (Array.isArray(data) && data.length) setEvents(data);
-      } catch {}
+        const res = await fetch(`/api/data/events?t=${Date.now()}`, {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache" },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length) setEvents(data);
+        }
+      } catch (err) {
+        console.error("Failed to load events:", err);
+      }
     }
     load();
   }, []);
 
-  const currentDay = events[activeDayIndex] || events[0];
+  const currentDay = events[activeDayIndex] || events[0] || { items: [] };
 
   function handleSaveItem(e) {
     e.preventDefault();
@@ -43,9 +50,9 @@ export default function AdminEventsPage() {
   }
 
   function handleDeleteItem(idx) {
-    if (!confirm("Are you sure you want to delete this event?")) return;
+    if (!confirm("Are you sure you want to delete this event? Remember to click 'Save Changes' afterwards.")) return;
     const updatedEvents = [...events];
-    const dayItems = [...updatedEvents[activeDayIndex].items];
+    const dayItems = [...(updatedEvents[activeDayIndex].items || [])];
     dayItems.splice(idx, 1);
     updatedEvents[activeDayIndex] = { ...updatedEvents[activeDayIndex], items: dayItems };
     setEvents(updatedEvents);
@@ -60,10 +67,13 @@ export default function AdminEventsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(events),
       });
-      if (!res.ok) throw new Error();
-      setMessage("✅ Schedule changes saved successfully!");
-    } catch {
-      setMessage("❌ Failed to save. Please try again.");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to save");
+      }
+      setMessage("✅ Schedule changes saved permanently! Values will persist across refreshes.");
+    } catch (err) {
+      setMessage(`❌ Failed to save: ${err.message || "Please try again."}`);
     } finally {
       setSaving(false);
     }

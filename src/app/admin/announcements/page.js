@@ -12,9 +12,16 @@ export default function AdminAnnouncementsPage() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch("/api/data/announcements");
-        const data = await res.json();
-        setAnnouncements(Array.isArray(data) && data.length ? data : fallbackAnnouncements);
+        const res = await fetch(`/api/data/announcements?t=${Date.now()}`, {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache" },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setAnnouncements(Array.isArray(data) && data.length ? data : fallbackAnnouncements);
+        } else {
+          setAnnouncements(fallbackAnnouncements);
+        }
       } catch {
         setAnnouncements(fallbackAnnouncements);
       }
@@ -37,13 +44,17 @@ export default function AdminAnnouncementsPage() {
           imageUrl: imageUrl.trim() || null,
         }),
       });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to post");
+      }
       const newItem = await res.json();
       setAnnouncements((prev) => [newItem, ...prev]);
       setText("");
       setImageUrl("");
-      setMessage("✅ Announcement posted live on the website!");
-    } catch {
-      setMessage("❌ Failed to post. Please try again.");
+      setMessage("✅ Announcement posted permanently! It will persist across refreshes.");
+    } catch (err) {
+      setMessage(`❌ Failed to post: ${err.message || "Please try again."}`);
     } finally {
       setLoading(false);
     }
@@ -52,10 +63,12 @@ export default function AdminAnnouncementsPage() {
   async function handleDelete(id) {
     if (!confirm("Are you sure you want to delete this announcement?")) return;
     try {
-      await fetch(`/api/data/announcements?id=${id}`, { method: "DELETE" });
-      setAnnouncements((prev) => prev.filter((a) => a.id !== id));
-    } catch {
-      setMessage("❌ Failed to delete. Please try again.");
+      const res = await fetch(`/api/data/announcements?id=${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete");
+      setAnnouncements((prev) => prev.filter((a) => String(a.id) !== String(id)));
+      setMessage("✅ Announcement deleted permanently.");
+    } catch (err) {
+      setMessage(`❌ Failed to delete: ${err.message || "Please try again."}`);
     }
   }
 
@@ -96,6 +109,7 @@ export default function AdminAnnouncementsPage() {
                       src={item.imageUrl}
                       alt="Announcement attachment"
                       className="mt-2 rounded max-h-24 object-cover border border-[rgba(217,169,70,0.2)]"
+                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
                     />
                   )}
                   <span className="text-[0.65rem] text-muted block mt-2">
@@ -146,7 +160,7 @@ export default function AdminAnnouncementsPage() {
                 type="url"
                 value={imageUrl}
                 onChange={(e) => setImageUrl(e.target.value)}
-                placeholder="https://..."
+                placeholder="https://... (Direct image link)"
                 className="w-full bg-[#0c0704] border border-[rgba(217,169,70,0.25)] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-gold"
               />
             </div>

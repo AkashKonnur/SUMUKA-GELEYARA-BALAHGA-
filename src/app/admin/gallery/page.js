@@ -13,10 +13,17 @@ export default function AdminGalleryPage() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch("/api/data/gallery");
-        const data = await res.json();
-        if (Array.isArray(data)) setPhotos(data);
-      } catch {}
+        const res = await fetch(`/api/data/gallery?t=${Date.now()}`, {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache" },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) setPhotos(data);
+        }
+      } catch (err) {
+        console.error("Failed to load gallery:", err);
+      }
     }
     load();
   }, []);
@@ -37,13 +44,17 @@ export default function AdminGalleryPage() {
           order: photos.length + 1,
         }),
       });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to add photo");
+      }
       const newPhoto = await res.json();
       setPhotos((prev) => [...prev, newPhoto]);
       setImageUrl("");
       setCaption("");
-      setMessage("✅ Photo added to gallery!");
-    } catch {
-      setMessage("❌ Failed to add photo. Please try again.");
+      setMessage("✅ Photo URL added permanently! It will persist across refreshes.");
+    } catch (err) {
+      setMessage(`❌ Failed to add photo: ${err.message || "Please try again."}`);
     } finally {
       setLoading(false);
     }
@@ -78,13 +89,17 @@ export default function AdminGalleryPage() {
           order: photos.length + 1,
         }),
       });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to save photo record");
+      }
       const newPhoto = await res.json();
       setPhotos((prev) => [...prev, newPhoto]);
       setCaption("");
       if (fileInputRef.current) fileInputRef.current.value = "";
-      setMessage("✅ Photo uploaded and added to gallery!");
-    } catch {
-      setMessage("❌ Upload failed. Please try again.");
+      setMessage("✅ Photo uploaded and saved permanently!");
+    } catch (err) {
+      setMessage(`❌ Upload failed: ${err.message || "Please try again."}`);
     } finally {
       setLoading(false);
     }
@@ -93,11 +108,12 @@ export default function AdminGalleryPage() {
   async function handleDelete(id) {
     if (!confirm("Are you sure you want to remove this photo?")) return;
     try {
-      await fetch(`/api/data/gallery?id=${id}`, { method: "DELETE" });
-      setPhotos((prev) => prev.filter((p) => p.id !== id));
-      setMessage("✅ Photo removed from gallery.");
-    } catch {
-      setMessage("❌ Failed to delete. Please try again.");
+      const res = await fetch(`/api/data/gallery?id=${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete");
+      setPhotos((prev) => prev.filter((p) => String(p.id) !== String(id)));
+      setMessage("✅ Photo removed permanently.");
+    } catch (err) {
+      setMessage(`❌ Failed to delete: ${err.message || "Please try again."}`);
     }
   }
 
@@ -106,7 +122,7 @@ export default function AdminGalleryPage() {
       <div className="mb-6">
         <h1 className="font-[var(--font-heading)] text-xl text-white">Photo Gallery Manager</h1>
         <p className="text-xs text-muted mt-1">
-          Upload photos directly or paste image URLs. Changes appear on the public website within 30 seconds.
+          Upload photos directly or paste image URLs. Changes appear on the public website immediately.
         </p>
       </div>
 
@@ -131,7 +147,12 @@ export default function AdminGalleryPage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               {photos.map((p) => (
                 <div key={p.id} className="bg-[#0f0a07] border border-[rgba(255,255,255,0.08)] rounded-lg overflow-hidden group relative">
-                  <img src={p.imageUrl} alt={p.caption || "Gallery"} className="w-full h-32 object-cover" />
+                  <img
+                    src={p.imageUrl}
+                    alt={p.caption || "Gallery"}
+                    className="w-full h-32 object-cover"
+                    onError={(e) => { e.currentTarget.src = '/assets/ganesha-hero.png'; }}
+                  />
                   <div className="p-2.5">
                     <p className="text-[0.75rem] text-[#cfc0ab] truncate">{p.caption}</p>
                   </div>
@@ -158,18 +179,18 @@ export default function AdminGalleryPage() {
               onClick={() => setUploadMode("url")}
               className={`flex-1 py-2 text-[0.72rem] font-semibold transition-colors ${
                 uploadMode === "url"
-                  ? "bg-gold text-maroon-deep"
+                  ? "bg-gold text-maroon-deep font-bold"
                   : "bg-transparent text-[#cfc0ab] hover:bg-gold/10"
               }`}
             >
-              📎 Paste URL
+              📎 Paste Image URL
             </button>
             <button
               type="button"
               onClick={() => setUploadMode("file")}
               className={`flex-1 py-2 text-[0.72rem] font-semibold transition-colors ${
                 uploadMode === "file"
-                  ? "bg-gold text-maroon-deep"
+                  ? "bg-gold text-maroon-deep font-bold"
                   : "bg-transparent text-[#cfc0ab] hover:bg-gold/10"
               }`}
             >
@@ -181,14 +202,14 @@ export default function AdminGalleryPage() {
             <form onSubmit={handleAddPhotoUrl} className="space-y-4">
               <div>
                 <label className="block text-xs text-[#cfc0ab] mb-1 font-medium">
-                  Image URL (publicly hosted)
+                  Image URL (Public direct link)
                 </label>
                 <input
                   type="url"
                   required
                   value={imageUrl}
                   onChange={(e) => setImageUrl(e.target.value)}
-                  placeholder="https://..."
+                  placeholder="https://... (e.g. from Google Drive, Imgur, Cloudinary)"
                   className="w-full bg-[#0c0704] border border-[rgba(217,169,70,0.25)] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-gold"
                 />
               </div>
@@ -205,7 +226,7 @@ export default function AdminGalleryPage() {
               </div>
 
               <button type="submit" disabled={loading} className="btn-primary !py-2.5 !px-5 text-xs font-bold w-full disabled:opacity-50">
-                {loading ? "Adding..." : "Add Photo →"}
+                {loading ? "Adding..." : "Add Photo URL →"}
               </button>
             </form>
           ) : (
@@ -222,7 +243,7 @@ export default function AdminGalleryPage() {
                   className="w-full bg-[#0c0704] border border-[rgba(217,169,70,0.25)] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-gold file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-gold/20 file:text-gold-light hover:file:bg-gold/30 file:cursor-pointer"
                 />
                 <p className="text-[0.7rem] text-muted mt-1">
-                  ⚠️ On Render free tier, uploaded files may reset on server restart. Use URLs for permanent images.
+                  💡 Note: Direct image URLs (Google Drive / Imgur / Cloudinary) are recommended for 100% cloud permanence.
                 </p>
               </div>
 
@@ -242,13 +263,6 @@ export default function AdminGalleryPage() {
               </button>
             </form>
           )}
-
-          <div className="mt-4 p-3 bg-[rgba(217,169,70,0.05)] border border-[rgba(217,169,70,0.15)] rounded-lg">
-            <p className="text-[0.7rem] text-[#a89880] leading-relaxed">
-              💡 <strong className="text-gold-light">Tip:</strong> For best results on Render, upload images to{" "}
-              <span className="text-gold-light">Google Drive, Imgur, or Cloudinary</span> and paste the direct image URL.
-            </p>
-          </div>
         </div>
       </div>
     </div>

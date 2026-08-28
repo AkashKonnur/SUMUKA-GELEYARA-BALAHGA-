@@ -96,6 +96,7 @@ function JourneyCard({ item, index, isCurrent }) {
               src={item.photo}
               alt={`Year ${item.year}`}
               className="w-full h-full object-cover"
+              onError={(e) => { e.currentTarget.style.display = 'none'; }}
             />
           </div>
         )}

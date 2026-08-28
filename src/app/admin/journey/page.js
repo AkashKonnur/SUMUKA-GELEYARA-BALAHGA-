@@ -11,15 +11,24 @@ export default function AdminJourneyPage() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch("/api/data/journey");
-        const data = await res.json();
-        if (Array.isArray(data) && data.length) setJourney(data);
-      } catch {}
+        const res = await fetch(`/api/data/journey?t=${Date.now()}`, {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache" },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length) {
+            setJourney(data);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load journey:", err);
+      }
     }
     load();
   }, []);
 
-  const activeCard = journey[selectedIdx] || journey[0];
+  const activeCard = journey[selectedIdx] || journey[0] || { year: 2016, tagline: "", photo: "" };
 
   function handleUpdateCurrent(field, value) {
     const updated = [...journey];
@@ -36,10 +45,13 @@ export default function AdminJourneyPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(journey),
       });
-      if (!res.ok) throw new Error();
-      setMessage("✅ 11-Year Journey saved successfully!");
-    } catch {
-      setMessage("❌ Failed to save. Please try again.");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to save");
+      }
+      setMessage("✅ 11-Year Journey saved permanently! Values will persist across refreshes.");
+    } catch (err) {
+      setMessage(`❌ Failed to save: ${err.message || "Please try again."}`);
     } finally {
       setSaving(false);
     }
@@ -51,10 +63,14 @@ export default function AdminJourneyPage() {
         <div>
           <h1 className="font-[var(--font-heading)] text-xl text-white">11-Year Journey Editor</h1>
           <p className="text-xs text-muted mt-1">
-            Customize the taglines for all 11 years of celebration.
+            Customize taglines and photo URLs for all 11 years of celebration.
           </p>
         </div>
-        <button onClick={handleSaveAll} disabled={saving} className="btn-primary !py-2.5 !px-5 text-xs font-bold disabled:opacity-50">
+        <button
+          onClick={handleSaveAll}
+          disabled={saving}
+          className="btn-primary !py-2.5 !px-5 text-xs font-bold disabled:opacity-50"
+        >
           {saving ? "Saving..." : "💾 Save All Years"}
         </button>
       </div>
@@ -69,7 +85,7 @@ export default function AdminJourneyPage() {
       <div className="flex gap-2 overflow-x-auto pb-3 mb-6">
         {journey.map((item, idx) => (
           <button
-            key={item.year}
+            key={item.year || idx}
             onClick={() => setSelectedIdx(idx)}
             className={`px-3.5 py-2 rounded-lg text-xs font-semibold shrink-0 cursor-pointer border transition-all ${
               selectedIdx === idx
@@ -78,6 +94,7 @@ export default function AdminJourneyPage() {
             }`}
           >
             {item.year === 2026 ? "★ 2026 (11th)" : `${item.year}`}
+            {item.photo ? " 🖼️" : ""}
           </button>
         ))}
       </div>
@@ -102,14 +119,20 @@ export default function AdminJourneyPage() {
               type="url"
               value={activeCard.photo || ""}
               onChange={(e) => handleUpdateCurrent("photo", e.target.value)}
-              placeholder="https://..."
+              placeholder="https://... (Direct image link)"
               className="w-full bg-[#0c0704] border border-[rgba(217,169,70,0.25)] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-gold"
             />
+            <p className="text-[0.7rem] text-muted mt-1">Paste a direct image URL from Google Drive, Imgur, Cloudinary, etc.</p>
           </div>
           {activeCard.photo && (
             <div>
               <p className="text-xs text-muted mb-1">Preview:</p>
-              <img src={activeCard.photo} alt={`Year ${activeCard.year}`} className="max-h-40 rounded-lg object-cover border border-gold/30" />
+              <img
+                src={activeCard.photo}
+                alt={`Year ${activeCard.year}`}
+                className="max-h-40 rounded-lg object-cover border border-gold/30"
+                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+              />
             </div>
           )}
         </div>

@@ -1,32 +1,28 @@
 /**
- * Persistent data layer — MongoDB Atlas.
+ * Persistent data layer — Dual-Engine (MongoDB Atlas Cloud + Local JSON Sync).
  *
- * Replaces the previous ephemeral file-based JSON storage.
- * Data is stored in MongoDB and survives all Render restarts/redeploys/sleep cycles.
+ * ARCHITECTURE:
+ * 1. Primary Cloud Storage: MongoDB Atlas (when MONGODB_URI is configured).
+ *    Guarantees permanent data persistence across all Render sleep/restart/redeploy cycles.
+ * 2. Local Sync / Fallback: File-based JSON storage in DATA_DIR (default: ./data/).
+ *    Guarantees that local development, offline mode, and zero-config testing always work
+ *    and survive browser refreshes (Ctrl+R) and server restarts.
+ * 3. Default Fallback: fallbackData.js values when both storage engines are clean/empty.
  *
- * Collections map:
- *   announcements  → array of documents
- *   events         → array of day documents
- *   gallery        → array of photo documents
- *   journey        → array of year documents
- *   donationLog    → array of donation records
- *   siteInfo       → single document (stored as { _id: "singleton", ...fields })
- *   donation       → single document
- *   location       → single document
- *
- * Fallback behaviour:
- *   If MONGODB_URI is not set, or if a DB read fails, the function returns
- *   fallbackData.js values — exactly as before. This guarantees the public
- *   website always renders, even without a database.
- *
- * Environment variables required:
- *   MONGODB_URI — full MongoDB connection string from Atlas (or any MongoDB host)
- *
- * NOTE: File-based local JSON files (./data/*.json) are NO LONGER USED.
- *       Files in that directory can be safely deleted.
+ * Collections:
+ *   announcements → array of announcements
+ *   events        → array of day objects (Day 1, 2, 3)
+ *   gallery       → array of photo objects
+ *   journey       → array of 11-year milestone objects
+ *   donationLog   → array of donation transaction records
+ *   siteInfo      → single document (about story, hero text, contacts, background image)
+ *   donation      → single document (UPI ID, QR URL, instructions)
+ *   location      → single document (address, map notes)
  */
 
-import clientPromise from "./db";
+import fs from "fs";
+import path from "path";
+import clientPromise from "./db.js";
 import {
   fallbackSiteInfo,
   fallbackEvents,
@@ -37,6 +33,7 @@ import {
 } from "./fallbackData.js";
 
 const DB_NAME = "sumuka";
+const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data");
 
 // Collections that store arrays vs. single objects
 const ARRAY_COLLECTIONS = ["announcements", "gallery", "events", "journey", "donationLog"];
@@ -54,114 +51,177 @@ const DEFAULTS = {
   siteInfo: fallbackSiteInfo,
 };
 
-/**
- * Get a MongoDB collection handle.
- * Returns null if MONGODB_URI is not configured.
- */
-async function getCollection(name) {
-  if (!clientPromise) return null;
+// ─── LOCAL FILE SYSTEM HELPERS ──────────────────────────────────────────────────
+
+function ensureLocalDir() {
   try {
-    const client = await clientPromise;
-    return client.db(DB_NAME).collection(name);
-  } catch {
+    if (!fs.existsSync(/*turbopackIgnore: true*/ DATA_DIR)) {
+      fs.mkdirSync(/*turbopackIgnore: true*/ DATA_DIR, { recursive: true });
+    }
+  } catch (err) {
+    console.error("[data] Failed to create local data directory:", err);
+  }
+}
+
+function readLocalFile(name) {
+  try {
+    ensureLocalDir();
+    const filePath = path.join(DATA_DIR, `${name}.json`);
+    if (!fs.existsSync(/*turbopackIgnore: true*/ filePath)) return null;
+    const raw = fs.readFileSync(/*turbopackIgnore: true*/ filePath, "utf8");
+    if (!raw || !raw.trim()) return null;
+    return JSON.parse(raw);
+  } catch (err) {
+    console.error(`[data] Error reading local file ${name}.json:`, err);
     return null;
   }
 }
 
+function writeLocalFile(name, data) {
+  try {
+    ensureLocalDir();
+    const filePath = path.join(DATA_DIR, `${name}.json`);
+    fs.writeFileSync(/*turbopackIgnore: true*/ filePath, JSON.stringify(data, null, 2), "utf8");
+  } catch (err) {
+    console.error(`[data] Error writing local file ${name}.json:`, err);
+  }
+}
+
+// ─── MONGODB HELPERS ────────────────────────────────────────────────────────────
+
+async function getCollection(name) {
+  if (!clientPromise) return null;
+  try {
+    const client = await clientPromise;
+    if (!client) return null;
+    return client.db(DB_NAME).collection(name);
+  } catch (err) {
+    console.warn(`[data] MongoDB connection warning for ${name}:`, err.message);
+    return null;
+  }
+}
+
+// ─── PUBLIC READ / WRITE METHODS ───────────────────────────────────────────────
+
 /**
- * Read a collection from MongoDB.
- *
- * - Array collections: returns an array of documents (sorted by createdAt desc for logs)
- * - Object collections: returns the singleton document
- *
- * Returns the fallback value if DB is unavailable or collection is empty.
+ * Read a collection.
+ * Tries MongoDB first; if not configured or empty, tries local JSON file; then fallback defaults.
  */
 export async function readData(name) {
+  // 1. Try reading from MongoDB Atlas (if configured)
   try {
     const col = await getCollection(name);
-    if (!col) return DEFAULTS[name] ?? [];
+    if (col) {
+      if (ARRAY_COLLECTIONS.includes(name)) {
+        let sort = {};
+        if (name === "donationLog") sort = { createdAt: -1 };
+        else if (name === "journey") sort = { year: 1, order: 1 };
+        else if (name === "events") sort = { dayNumber: 1 };
 
-    if (ARRAY_COLLECTIONS.includes(name)) {
-      const sort = name === "donationLog" ? { createdAt: -1 } : {};
-      const docs = await col.find({}, { projection: { _id: 0 } }).sort(sort).toArray();
-      if (docs && docs.length > 0) return docs;
-      return DEFAULTS[name] ?? [];
+        const docs = await col.find({}, { projection: { _id: 0 } }).sort(sort).toArray();
+        if (Array.isArray(docs) && docs.length > 0) {
+          // Keep local file in sync
+          writeLocalFile(name, docs);
+          return docs;
+        }
+      } else if (OBJECT_COLLECTIONS.includes(name)) {
+        const doc = await col.findOne({ _id: "singleton" }, { projection: { _id: 0 } });
+        if (doc && Object.keys(doc).length > 0) {
+          // Keep local file in sync
+          writeLocalFile(name, doc);
+          return doc;
+        }
+      }
     }
-
-    if (OBJECT_COLLECTIONS.includes(name)) {
-      const doc = await col.findOne({ _id: "singleton" }, { projection: { _id: 0 } });
-      if (doc && Object.keys(doc).length > 0) return doc;
-      return DEFAULTS[name] ?? {};
-    }
-
-    return DEFAULTS[name] ?? [];
-  } catch {
-    return DEFAULTS[name] ?? [];
+  } catch (err) {
+    console.warn(`[data] MongoDB read failed for ${name}, falling back to local file:`, err.message);
   }
+
+  // 2. Fallback to local JSON file
+  const localData = readLocalFile(name);
+  if (localData !== null) {
+    if (ARRAY_COLLECTIONS.includes(name) && Array.isArray(localData) && localData.length > 0) {
+      return localData;
+    }
+    if (OBJECT_COLLECTIONS.includes(name) && localData && Object.keys(localData).length > 0) {
+      return localData;
+    }
+  }
+
+  // 3. Fallback to defaults
+  return DEFAULTS[name] ?? (ARRAY_COLLECTIONS.includes(name) ? [] : {});
 }
 
 /**
- * Write data to MongoDB.
- *
- * - Array collections: REPLACES the entire collection (delete-all then insert-many)
- * - Object collections: upserts the singleton document
+ * Bulk write / replace a collection.
+ * Writes to local JSON file AND MongoDB Atlas (if available).
  */
 export async function writeData(name, data) {
-  const col = await getCollection(name);
-  if (!col) {
-    // Silently ignore if DB is unavailable — admin gets an HTTP error from the API route
-    throw new Error("MONGODB_URI is not configured. Cannot persist data.");
-  }
+  // 1. Always write to local JSON file first (guarantees local survival)
+  writeLocalFile(name, data);
 
-  if (ARRAY_COLLECTIONS.includes(name)) {
-    // Delete existing + re-insert (bulk replace)
-    const items = Array.isArray(data) ? data : [];
-    await col.deleteMany({});
-    if (items.length > 0) {
-      // Strip any _id fields before inserting (avoid duplicate key errors)
-      const docs = items.map(({ _id, ...rest }) => rest);
-      await col.insertMany(docs);
+  // 2. Persist to MongoDB Atlas (if configured)
+  try {
+    const col = await getCollection(name);
+    if (col) {
+      if (ARRAY_COLLECTIONS.includes(name)) {
+        const items = Array.isArray(data) ? data : [];
+        await col.deleteMany({});
+        if (items.length > 0) {
+          const docs = items.map(({ _id, ...rest }) => rest);
+          await col.insertMany(docs);
+        }
+      } else if (OBJECT_COLLECTIONS.includes(name)) {
+        const { _id, ...fields } = data;
+        await col.replaceOne(
+          { _id: "singleton" },
+          { _id: "singleton", ...fields, updatedAt: new Date().toISOString() },
+          { upsert: true }
+        );
+      }
     }
-    return;
-  }
-
-  if (OBJECT_COLLECTIONS.includes(name)) {
-    const { _id, ...fields } = data;
-    await col.replaceOne({ _id: "singleton" }, { _id: "singleton", ...fields }, { upsert: true });
-    return;
+  } catch (err) {
+    console.warn(`[data] MongoDB write failed for ${name} (local file was saved):`, err.message);
   }
 }
 
 /**
- * Append a single item to an array collection (used by POST /api/data/[collection]).
- * More efficient than read-all → delete-all → insert-all for high-frequency writes.
+ * Append a single item to an array collection.
  */
 export async function appendItem(name, item) {
-  const col = await getCollection(name);
-  if (!col) throw new Error("MONGODB_URI is not configured.");
-  const { _id, ...rest } = item;
-  await col.insertOne(rest);
+  const current = (await readData(name)) || [];
+  const { _id, ...cleanItem } = item;
+  const updated = [cleanItem, ...(Array.isArray(current) ? current : [])];
+
+  // Write to both storage engines
+  await writeData(name, updated);
+  return cleanItem;
 }
 
 /**
  * Delete a single item by its `id` field from an array collection.
  */
 export async function deleteItem(name, id) {
-  const col = await getCollection(name);
-  if (!col) throw new Error("MONGODB_URI is not configured.");
-  await col.deleteOne({ id });
+  const current = (await readData(name)) || [];
+  const updated = Array.isArray(current) ? current.filter((item) => String(item.id) !== String(id)) : [];
+
+  // Write to both storage engines
+  await writeData(name, updated);
 }
 
 /**
  * Merge-update a single-object collection (shallow merge).
  */
 export async function mergeData(name, patch) {
-  const col = await getCollection(name);
-  if (!col) throw new Error("MONGODB_URI is not configured.");
-  await col.updateOne(
-    { _id: "singleton" },
-    { $set: { ...patch, updatedAt: new Date().toISOString() } },
-    { upsert: true }
-  );
-  return readData(name);
+  const current = (await readData(name)) || DEFAULTS[name] || {};
+  const { _id, ...cleanPatch } = patch;
+  const updated = {
+    ...current,
+    ...cleanPatch,
+    updatedAt: new Date().toISOString(),
+  };
+
+  // Write to both storage engines
+  await writeData(name, updated);
+  return updated;
 }

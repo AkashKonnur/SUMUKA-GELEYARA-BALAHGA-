@@ -178,9 +178,14 @@ export default function AdminDonationsLogPage() {
   async function loadLogs() {
     setLoading(true);
     try {
-      const res = await fetch("/api/data/donationLog");
-      const data = await res.json();
-      if (Array.isArray(data)) setLogs(data);
+      const res = await fetch(`/api/data/donationLog?t=${Date.now()}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache" },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) setLogs(data);
+      }
     } catch { }
     setLoading(false);
   }
