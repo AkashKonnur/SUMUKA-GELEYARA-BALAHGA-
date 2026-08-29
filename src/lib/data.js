@@ -28,6 +28,7 @@ import {
   fallbackEvents,
   fallbackAnnouncements,
   fallbackJourney,
+  fallbackGallery,
   fallbackDonation,
   fallbackLocation,
 } from "./fallbackData.js";
@@ -43,7 +44,7 @@ const OBJECT_COLLECTIONS = ["donation", "location", "siteInfo"];
 const DEFAULTS = {
   announcements: fallbackAnnouncements,
   events: fallbackEvents,
-  gallery: [],
+  gallery: fallbackGallery,
   journey: fallbackJourney,
   donationLog: [],
   donation: fallbackDonation,

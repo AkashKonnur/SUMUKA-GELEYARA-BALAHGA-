@@ -16,6 +16,7 @@ import {
   fallbackEvents,
   fallbackAnnouncements,
   fallbackJourney,
+  fallbackGallery,
   fallbackDonation,
   fallbackLocation,
 } from "@/lib/fallbackData";
@@ -33,7 +34,7 @@ export default async function HomePage() {
   let journey = fallbackJourney;
   let donation = fallbackDonation;
   let location = fallbackLocation;
-  let gallery = [];
+  let gallery = fallbackGallery;
 
   try {
     const [
