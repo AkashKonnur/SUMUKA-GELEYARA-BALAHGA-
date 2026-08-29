@@ -20,7 +20,7 @@ const YEAR_IMAGES = {
 };
 
 const HERO_IMAGE_URL =
-  "https://lh3.googleusercontent.com/pw/AP1GczMR0JhcNb1olBvSS7VNe70Yb5bAw1jvEfilALztMVksYUvbm990yc6h3-rmcIW_6fVejCOK-1MU8jeeR5r7eps6lEPisGS4ImsPn12LihKi0bxK7Z9sitnJ-uEgCj9YiuRob9wKdxuLxQZMLpArhTC=w1260-h945-s-no-gm?authuser=0";
+  "https://lh3.googleusercontent.com/pw/AP1GczMR0JhcNb1olBvSS7VNe70Yb5bAw1jvEfilALztMVksYpUvbm990yc6h3-rmcIW_6fVejCOK-1MU8jeeR5r7eps6lEPisGS4ImsPn12LihKi0bxK7Z9sitnJ-uEgCj9YiuRob9wKdxuLxQZMLpArhTC=w1260-h945-s-no-gm?authuser=0";
 
 const QR_CODE_URL =
   "https://lh3.googleusercontent.com/pw/AP1GczMypOlx8QcRKh8eJazYyNqaq9KtJT9rJSCxiVH_gHUZLAh23mYtKQAMJ-aa68J6NaSXJDav9DFryCrGVTlkXrorLSwHI274jmw1m7CKhHi0vTtzYTAIOdbl-Bz7hv8aYwc0krH1Au6SsyIWHL-3LFQ=w536-h613-s-no-gm?authuser=0";

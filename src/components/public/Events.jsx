@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import ScrollReveal from "./ScrollReveal";
-import { fallbackEvents } from "@/lib/fallbackData";
+import { fallbackEvents, fallbackSiteInfo } from "@/lib/fallbackData";
 
 export default function Events({ events }) {
   const data = events?.length ? events : fallbackEvents;
@@ -33,7 +33,7 @@ export default function Events({ events }) {
               transition={{ duration: 0.3 }}
               className="relative min-h-[330px] rounded-xl p-7 text-[#f7ead5] overflow-hidden cursor-pointer group"
               style={{
-                backgroundImage: "url('/assets/ganeshotsava-design.png')",
+                backgroundImage: `url('${fallbackSiteInfo.backgroundImageUrl}')`,
                 backgroundSize: "cover",
                 backgroundPosition: i === 0 ? "center" : i === 1 ? "55% 60%" : "85% 65%",
               }}

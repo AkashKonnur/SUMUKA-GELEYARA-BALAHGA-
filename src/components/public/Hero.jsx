@@ -37,7 +37,7 @@ export default function Hero({ siteInfo }) {
       <div
         className="absolute inset-0 bg-cover bg-center"
         style={{
-          backgroundImage: `url('${data.backgroundImageUrl || "/assets/ganeshotsava-design.png"}')`
+          backgroundImage: `url('${data.backgroundImageUrl || fallbackSiteInfo.backgroundImageUrl}')`
         }}
       />
 
